@@ -19,6 +19,19 @@ if($("registerForm")){
         tx.set(restaurantRef,{name,slug,tableCount:count,active:true,createdAt:serverTimestamp()});
         tx.set(ownerRef,{ownerUid:credential.user.uid,createdAt:serverTimestamp()});
         for(let n=1;n<=count;n++)tx.set(doc(db,"restaurants",slug,"tables",String(n)),{number:n,active:true,label:"მაგიდა "+n});
+        if($("seedMenu")?.checked){
+          const sampleMenu=[
+            {name:"აჭარული ხაჭაპური",description:"ტრადიციული აჭარული ხაჭაპური ყველითა და კვერცხით",price:18.5,category:"ცომეული"},
+            {name:"იმერული ხაჭაპური",description:"იმერული ყველით გამომცხვარი ხაჭაპური",price:16,category:"ცომეული"},
+            {name:"ხინკალი ქალაქური",description:"წვნიანი ხინკალი საქონლისა და ღორის ხორცით",price:1.8,category:"ქართული"},
+            {name:"ცეზარის სალათი",description:"ქათამი, სალათის ფოთოლი, პარმეზანი და ცეზარის სოუსი",price:17,category:"სალათი"},
+            {name:"ქათმის ბურგერი",description:"ქათმის ფილე, სალათის ფოთოლი, პომიდორი და სოუსი",price:19,category:"ბურგერი"},
+            {name:"კარტოფილი ფრი",description:"ხრაშუნა კარტოფილი ფრი",price:7,category:"გარნირი"},
+            {name:"ლიმონათი",description:"კლასიკური ქართული ლიმონათი 0.5 ლ",price:4.5,category:"სასმელი"},
+            {name:"წყალი",description:"წყალი 0.5 ლ",price:2,category:"სასმელი"}
+          ];
+          for(const dish of sampleMenu)tx.set(doc(db,"restaurants",slug,"menu",slug+"-"+slugify(dish.name)),{...dish,active:true,createdAt:serverTimestamp(),demo:true});
+        }
       });
       location.href="business.html?restaurant="+encodeURIComponent(slug);
     }catch(err){msg(err.message);btn.disabled=false}
