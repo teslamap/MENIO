@@ -7,21 +7,27 @@ service cloud.firestore {
 
     function owns(slug) {
       return signedIn()
-        && getAfter(/databases/$(database)/documents/restaurants/$(slug)).data.ownerUid == request.auth.uid;
+        && getAfter(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid;
     }
 
     function ownsExisting(slug) {
       return signedIn()
-        && get(/databases/$(database)/documents/restaurants/$(slug)).data.ownerUid == request.auth.uid;
+        && get(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid;
     }
 
     match /restaurants/{slug} {
+      // Public profile only: never store ownerUid or owner email in this document.
       allow read: if true;
       allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['name', 'slug', 'tableCount', 'active', 'createdAt'])
         && request.resource.data.slug == slug
-        && request.resource.data.active == true;
-      allow update, delete: if ownsExisting(slug);
+        && request.resource.data.active == true
+        && existsAfter(/databases/$(database)/documents/restaurantOwners/$(slug))
+        && getAfter(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid;
+      allow update: if ownsExisting(slug)
+        && request.resource.data.slug == resource.data.slug
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tableCount', 'active']);
+      allow delete: if false;
 
       match /tables/{tableId} {
         allow read: if true;
@@ -32,6 +38,17 @@ service cloud.firestore {
         allow read: if true;
         allow write: if owns(slug);
       }
+    }
+
+    // Private ownership mapping: never publicly readable or client-editable after creation.
+    match /restaurantOwners/{slug} {
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/restaurants/$(slug))
+        && getAfter(/databases/$(database)/documents/restaurants/$(slug)).data.slug == slug;
+      allow update, delete: if false;
     }
 
     match /orders/{orderId} {
