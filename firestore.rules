@@ -1,1 +1,75 @@
-rules_version = '2'; service cloud.firestore { match /databases/{database}/documents { function signedIn(){return request.auth != null;} function owns(slug){return signedIn() && get(/databases/$(database)/documents/restaurants/$(slug)).data.ownerUid == request.auth.uid;} match /restaurants/{slug} { allow read: if true; allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid && request.resource.data.slug == slug && request.resource.data.active == true; allow update,delete: if owns(slug); match /tables/{id} { allow read: if true; allow write: if owns(slug); } match /menu/{id} { allow read: if true; allow write: if owns(slug); } } match /orders/{id} { allow create: if signedIn() && request.resource.data.keys().hasAll(['restaurantSlug','tableNumber','items','total','status','paymentStatus','createdAt']) && request.resource.data.status == 'new' && request.resource.data.paymentStatus == 'unpaid' && request.resource.data.items is list && request.resource.data.items.size() > 0 && request.resource.data.tableNumber is int && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)) && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(string(request.resource.data.tableNumber))); allow read: if signedIn() && owns(resource.data.restaurantSlug); allow update: if signedIn() && owns(resource.data.restaurantSlug) && request.resource.data.restaurantSlug == resource.data.restaurantSlug && request.resource.data.tableNumber == resource.data.tableNumber && request.resource.data.items == resource.data.items && request.resource.data.total == resource.data.total; allow delete: if false; } } }
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(slug) {
+      return signedIn()
+        && getAfter(/databases/$(database)/documents/restaurants/$(slug)).data.ownerUid == request.auth.uid;
+    }
+
+    function ownsExisting(slug) {
+      return signedIn()
+        && get(/databases/$(database)/documents/restaurants/$(slug)).data.ownerUid == request.auth.uid;
+    }
+
+    match /restaurants/{slug} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.slug == slug
+        && request.resource.data.active == true;
+      allow update, delete: if ownsExisting(slug);
+
+      match /tables/{tableId} {
+        allow read: if true;
+        allow write: if owns(slug);
+      }
+
+      match /menu/{dishId} {
+        allow read: if true;
+        allow write: if owns(slug);
+      }
+    }
+
+    match /orders/{orderId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll([
+          'restaurantSlug', 'tableNumber', 'tableId', 'items',
+          'total', 'status', 'paymentStatus', 'createdAt'
+        ])
+        && request.resource.data.restaurantSlug is string
+        && request.resource.data.tableNumber is int
+        && request.resource.data.tableId is string
+        && request.resource.data.tableId == string(request.resource.data.tableNumber)
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.total is number
+        && request.resource.data.total > 0
+        && request.resource.data.status == 'new'
+        && request.resource.data.paymentStatus == 'unpaid'
+        && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug))
+        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)).data.active == true
+        && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId))
+        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.number == request.resource.data.tableNumber
+        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.active == true;
+
+      allow read: if signedIn() && ownsExisting(resource.data.restaurantSlug);
+
+      allow update: if signedIn()
+        && ownsExisting(resource.data.restaurantSlug)
+        && request.resource.data.restaurantSlug == resource.data.restaurantSlug
+        && request.resource.data.tableNumber == resource.data.tableNumber
+        && request.resource.data.tableId == resource.data.tableId
+        && request.resource.data.items == resource.data.items
+        && request.resource.data.total == resource.data.total
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus'])
+        && request.resource.data.status in ['new', 'accepted', 'preparing', 'completed', 'cancelled']
+        && request.resource.data.paymentStatus in ['unpaid', 'paid'];
+
+      allow delete: if false;
+    }
+  }
+}
