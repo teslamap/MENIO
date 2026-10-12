@@ -1,0 +1,56 @@
+name: MENIO static validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript module syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in ./*.js; do
+            echo "Checking $file"
+            node --input-type=module --check < "$file"
+          done
+      - name: Check local page assets and module references
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, sys
+          root = Path(".")
+          errors = []
+          for html in root.glob("*.html"):
+              source = html.read_text(encoding="utf-8")
+              for attr, pattern in [
+                  ("src", r'<script[^>]+src=["\']([^"\']+)["\']'),
+                  ("href", r'<link[^>]+href=["\']([^"\']+)["\']'),
+              ]:
+                  for ref in re.findall(pattern, source, re.I):
+                      if ref.startswith(("http://", "https://", "#", "mailto:")):
+                          continue
+                      local = ref.split("?", 1)[0].split("#", 1)[0]
+                      if local and not (root / local).exists():
+                          errors.append(f"{html}: missing {attr}={ref}")
+          if errors:
+              print("\n".join(errors))
+              sys.exit(1)
+          print("All local HTML script and stylesheet references exist.")
+          PY
+      - name: Ensure Firebase config has no placeholders
+        run: |
+          ! grep -Eq 'YOUR_API_KEY|YOUR_PROJECT_ID|YOUR_PROJECT\.firebaseapp\.com' firebase.js
