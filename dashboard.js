@@ -70,7 +70,12 @@ $("bulkPhotoFiles").onchange = () => {
   say(`${files.length} ფოტო მზადაა. გადაამოწმე შესაბამისობა და შეინახე.`);
 };
 $("saveBulkPhotos").onclick = async () => {
-  if (savingPhotos || !photoPairs.length || stopped) return;
+  if (savingPhotos) { say("ფოტოების შენახვა უკვე მიმდინარეობს."); return; }
+  if (stopped) { say("სესია დასრულდა. განაახლე გვერდი და სცადე თავიდან."); return; }
+  if (!photoPairs.length) {
+    say("ფოტოები დასამუშავებლად მზად არ არის. ხელახლა აირჩიე საქაღალდე და გადაამოწმე რაოდენობა.");
+    return;
+  }
   savingPhotos = true;
   $("saveBulkPhotos").disabled = true;
   $("bulkPhotoFiles").disabled = true;
