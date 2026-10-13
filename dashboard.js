@@ -34,10 +34,28 @@ function parseMenuImport(text) {
   return products;
 }
 const say = message => { $("businessMessage").textContent = message; };
+function setPhotoProgress(kind, value, label, state = "working") {
+  const progress = $(`${kind}PhotoProgress`), text = $(`${kind}PhotoProgressLabel`), percent = $(`${kind}PhotoProgressValue`);
+  $(`${kind}PhotoProgressWrap`).hidden = false;
+  progress.value = Math.max(0, Math.min(100, Math.round(value)));
+  progress.dataset.state = state;
+  text.textContent = label;
+  percent.textContent = `${progress.value}%`;
+}
+function resetPhotoProgress(kind) {
+  const wrap = $(`${kind}PhotoProgressWrap`);
+  if (!wrap) return;
+  wrap.hidden = true;
+  $(`${kind}PhotoProgress`).value = 0;
+  $(`${kind}PhotoProgress`).dataset.state = "working";
+  $(`${kind}PhotoProgressLabel`).textContent = "";
+  $(`${kind}PhotoProgressValue`).textContent = "0%";
+}
 let photoPairs = [], savingPhotos = false;
 $("bulkPhotoFiles").onchange = () => {
   photoPairs = [];
   $("bulkPhotoPreview").replaceChildren();
+  resetPhotoProgress("bulk");
   $("saveBulkPhotos").disabled = true;
   const files = [...$("bulkPhotoFiles").files].filter(file => /\.(jpe?g|png|webp)$/i.test(file.name))
     .sort((a,b) => a.name.localeCompare(b.name, "en", { numeric:true })).reverse();
@@ -58,15 +76,18 @@ $("saveBulkPhotos").onclick = async () => {
   $("bulkPhotoFiles").disabled = true;
   let saved = 0;
   try {
+    setPhotoProgress("bulk", 0, "ფოტოებს ვამზადებ…");
     const prepared = [];
     for (const pair of photoPairs) {
       if (!products.has(pair.id) || products.get(pair.id).name !== pair.name) throw Error("პროდუქტები შეიცვალა. ფოტოები თავიდან აირჩიე.");
       prepared.push({ ...pair, imageUrl:await encodeProductPhoto(pair.file) });
+      setPhotoProgress("bulk", prepared.length / photoPairs.length * 45, `ფოტოების დამუშავება ${prepared.length} / ${photoPairs.length}`);
     }
     for (const pair of prepared) {
       if (stopped) throw Error("სესია დასრულდა.");
       await updateDoc(doc(menuRef,pair.id), { imageUrl:pair.imageUrl, imagePath:"", updatedAt:serverTimestamp() });
       saved++;
+      setPhotoProgress("bulk", 45 + saved / prepared.length * 55, `ატვირთულია ${saved} / ${prepared.length} ფოტო`, saved === prepared.length ? "complete" : "working");
       say(`ინახება ფოტოები: ${saved} / ${prepared.length}`);
     }
     photoPairs = [];
@@ -74,6 +95,8 @@ $("saveBulkPhotos").onclick = async () => {
     $("bulkPhotoPreview").replaceChildren();
     say(`შენახულია ${saved} ფოტო უკუმიმართულებით.`);
   } catch (error) {
+    const progress = $("bulkPhotoProgress");
+    setPhotoProgress("bulk", progress.value, `ატვირთვა შეჩერდა: ${error.message}`, "error");
     say(`შენახულია ${saved} ფოტო. ${error.message}`);
   } finally {
     savingPhotos = false;
@@ -120,6 +143,7 @@ function listen(reference, target, render, markLoaded = () => {}) {
 }
 function resetProduct() {
   $("dishForm").reset();
+  resetPhotoProgress("dish");
   $("dishId").value = "";
   if (imageObjectURL) URL.revokeObjectURL(imageObjectURL);
   imageObjectURL = undefined;
@@ -158,9 +182,11 @@ function renderProducts() {
     const url = safeImage(product.imageUrl);
     if (url) {
       const img = element("img", undefined, "dish-photo");
+      const fallback = element("div", "ფოტოს ჩატვირთვა ვერ მოხერხდა", "dish-photo-placeholder");
+      fallback.hidden = true;
       img.src = url; img.alt = product.name; img.loading = "lazy";
-      img.onerror = () => img.hidden = true;
-      card.append(img);
+      img.onerror = () => { img.hidden = true; fallback.hidden = false; };
+      card.append(img, fallback);
     }
     card.append(element("span", categories.get(product.categoryId)?.name || product.category || "კატეგორიის გარეშე", "muted"),
       element("h3", product.name), element("p", product.description || ""),
@@ -273,6 +299,7 @@ function renderTables() {
   }
 }
 $("dishImage").onchange = () => {
+  resetPhotoProgress("dish");
   if (imageObjectURL) URL.revokeObjectURL(imageObjectURL);
   const file = $("dishImage").files[0];
   if (!file) { $("imagePreview").hidden=true; return; }
@@ -376,6 +403,7 @@ $("saveTheme").onclick = async () => {
 };
 $("dishForm").onsubmit = async event => {
   event.preventDefault(); const button=$("saveDish"); button.disabled=true;
+  let photoFile;
   try {
     const id=$("dishId").value, existing=id ? products.get(id) : null;
     if (id && !existing) throw Error("პროდუქტი უკვე წაშლილია.");
@@ -385,14 +413,26 @@ $("dishForm").onsubmit = async event => {
     const productDoc=id ? doc(menuRef,id) : doc(menuRef);
     let imageUrl=existing?.imageUrl || "";
     if ($("removeImage").checked) imageUrl="";
-    const file=$("dishImage").files[0];
-    if (file) imageUrl=await encodeProductPhoto(file);
+    photoFile=$("dishImage").files[0];
+    if (photoFile) {
+      setPhotoProgress("dish", 5, "ფოტოს ვამზადებ…");
+      imageUrl=await encodeProductPhoto(photoFile);
+      setPhotoProgress("dish", 55, "ფოტო დამუშავდა. ვტვირთავ…");
+    }
     const data={ name,price:Math.round(price*100)/100,description:$("dishDescription").value.trim(),category:"",
       categoryId,imageUrl,imagePath:"",active:$("dishActive").checked,updatedAt:serverTimestamp() };
+    if (photoFile) setPhotoProgress("dish", 78, "ფოტო ინახება მენიუში…");
     if (existing) await updateDoc(productDoc,data);
     else await setDoc(productDoc,{...data,createdAt:serverTimestamp()});
-    resetProduct(); say(existing ? "პროდუქტი განახლდა." : "პროდუქტი დაემატა.");
+    if (photoFile) setPhotoProgress("dish", 100, "ფოტო აიტვირთა.", "complete");
+    resetProduct();
+    if (photoFile) setPhotoProgress("dish", 100, "ფოტო აიტვირთა.", "complete");
+    say(existing ? "პროდუქტი განახლდა." : "პროდუქტი დაემატა.");
   } catch(error) {
+    if (photoFile) {
+      const progress = $("dishPhotoProgress");
+      setPhotoProgress("dish", progress.value, `ატვირთვა ვერ დასრულდა: ${error.message}`, "error");
+    }
     say("შეცდომა: "+error.message);
   } finally { button.disabled=false; }
 };
@@ -452,3 +492,4 @@ window.addEventListener("pagehide",() => {
   stopped=true; unsubscribers.forEach(unsubscribe => unsubscribe());
   if(imageObjectURL) URL.revokeObjectURL(imageObjectURL);
 });
+

@@ -230,4 +230,44 @@ test("guest menu groups dishes under sorted category headings",async()=>{
   assert.equal(sections[1].children[1].children.length,1);
 });
 
+test("single product photo upload shows progress through Firestore save",async()=>{
+  const h=setup("dashboard.js","dashboard.html",{"restaurants/test":{tableCount:1}});await h.settle();
+  h.nodes.get("dishName").value="კერძი";h.nodes.get("dishPrice").value="12";
+  h.nodes.get("dishImage").files=[{name:"dish.jpg",type:"image/jpeg",size:1024}];
+  await h.submit("dishForm");
+  assert.equal(h.nodes.get("dishPhotoProgressWrap").hidden,false);
+  assert.equal(h.nodes.get("dishPhotoProgress").value,100);
+  assert.equal(h.nodes.get("dishPhotoProgressLabel").textContent,"ფოტო აიტვირთა.");
+  assert.match([...h.database.values()].find(item=>item.name==="კერძი").imageUrl,/^data:image\/jpeg/);
+});
+
+test("bulk photo upload advances through preparation and save",async()=>{
+  const h=setup("dashboard.js","dashboard.html",{
+    "restaurants/test":{tableCount:2},
+    "restaurants/test/menu/a":{name:"ა კერძი",price:10},
+    "restaurants/test/menu/b":{name:"ბ კერძი",price:11}
+  });await h.settle();h.publish("restaurants/test/menu");
+  h.nodes.get("bulkPhotoFiles").files=[
+    {name:"one.jpg",type:"image/jpeg",size:1024},
+    {name:"two.jpg",type:"image/jpeg",size:1024}
+  ];
+  h.nodes.get("bulkPhotoFiles").onchange();
+  await h.nodes.get("saveBulkPhotos").onclick();
+  assert.equal(h.nodes.get("bulkPhotoProgressWrap").hidden,false);
+  assert.equal(h.nodes.get("bulkPhotoProgress").value,100);
+  assert.equal(h.nodes.get("bulkPhotoProgressLabel").textContent,"ატვირთულია 2 / 2 ფოტო");
+  assert.ok(["a","b"].every(id=>/^data:image\/jpeg/.test(h.database.get(`restaurants/test/menu/${id}`).imageUrl)));
+});
+
+test("guest menu shows a fallback when a saved product photo cannot load",async()=>{
+  const h=setup("menu.js","menu.html",{
+    "restaurants/test":{name:"Test",active:true},"restaurants/test/tables/1":{number:1,active:true},
+    "restaurants/test/menu/photo":{name:"Photo dish",price:12,active:true,imageUrl:"data:image/jpeg;base64,/9j/2Q=="}
+  },null);await h.settle();h.publish("restaurants/test/menu");
+  const card=h.nodes.get("menu").children[0].children[1].children[0],image=card.children[0],fallback=card.children[1];
+  image.onerror();
+  assert.equal(image.hidden,true);assert.equal(fallback.hidden,false);
+  assert.equal(fallback.textContent,"ფოტოს ჩატვირთვა ვერ მოხერხდა");
+});
+
 

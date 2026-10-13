@@ -45,8 +45,9 @@ function render(){
       const card=el("article",undefined,"dish-card");
       const photo = safeProductImage(dish.imageUrl);
       if(photo){
-        const image=el("img",undefined,"dish-photo");image.src=photo;image.alt=dish.name;image.loading="lazy";
-        image.onerror=()=>image.hidden=true;card.append(image);
+        const image=el("img",undefined,"dish-photo"),fallback=el("div","ფოტოს ჩატვირთვა ვერ მოხერხდა","dish-photo-placeholder");
+        fallback.hidden=true;image.src=photo;image.alt=dish.name;image.loading="lazy";
+        image.onerror=()=>{image.hidden=true;fallback.hidden=false;};card.append(image,fallback);
       }
       card.append(el("h3",dish.name),el("p",dish.description || ""));
       const row=el("div",undefined,"row"),button=el("button","დამატება +");
