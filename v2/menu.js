@@ -4,6 +4,9 @@ const params=new URLSearchParams(location.search),slug=params.get("restaurant"),
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false;
 let detailId=null;
+$("cartSummary").onclick=()=>$("orderBox").showModal();
+$("cartClose").onclick=()=>$("orderBox").close();
+$("orderBox").addEventListener("click",event=>{if(event.target===$("orderBox"))$("orderBox").close();});
 function addDish(dish){
   if(sending || !ready)return;
   const old=cart.get(dish.id);
@@ -41,7 +44,7 @@ function applyMenuTheme(color){
   document.documentElement?.style?.setProperty?.("--menu-foreground-color",luminance>.42?"#171920":"#f5f5f7");
 }
 const money=n=>Number(n).toFixed(2)+" ₾";
-const say=text=>{ $("message").textContent=text; };
+const say=text=>{ $("message").textContent=text;$("menuStatus").textContent=text; };
 const el=(tag,text,className)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;};
 function groupId(dish){return dish.categoryId ? "id:"+dish.categoryId : dish.category ? "legacy:"+dish.category : "none";}
 function groupName(dish){return categories.get(dish.categoryId)?.name || dish.category || "სხვა";}
