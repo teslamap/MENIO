@@ -52,51 +52,94 @@ function resetPhotoProgress(kind) {
   $(`${kind}PhotoProgressValue`).textContent = "0%";
 }
 let photoPairs = [], savingPhotos = false;
+function updateBulkPhotoMappingState() {
+  const assigned = photoPairs.filter(pair => pair.id);
+  const unique = new Set(assigned.map(pair => pair.id)).size === assigned.length;
+  $("saveBulkPhotos").disabled = savingPhotos || !assigned.length || !unique;
+  if (!unique) $("bulkPhotoHint").textContent = "ერთი პროდუქტი მხოლოდ ერთ ფოტოს მიაბი.";
+  else if (photoPairs.length && assigned.length < photoPairs.length)
+    $("bulkPhotoHint").textContent = `მიბმულია ${assigned.length} / ${photoPairs.length} ფოტო. შეურჩეული ფოტოები გამოტოვდება.`;
+  else if (assigned.length)
+    $("bulkPhotoHint").textContent = `${assigned.length} ფოტო მზადაა შესანახად.`;
+}
 $("bulkPhotoFiles").onchange = () => {
   photoPairs = [];
   $("bulkPhotoPreview").replaceChildren();
   resetPhotoProgress("bulk");
+  $("bulkPhotoHint").textContent = "";
   $("saveBulkPhotos").disabled = true;
   const files = [...$("bulkPhotoFiles").files].filter(file => /\.(jpe?g|png|webp)$/i.test(file.name))
     .sort((a,b) => a.name.localeCompare(b.name, "en", { numeric:true })).reverse();
   const ordered = [...products.values()].sort((a,b) => a.name.localeCompare(b.name, "ka"));
-  if (!productsLoaded || !ordered.length) { say("ჯერ დაელოდე პროდუქტების ჩატვირთვას."); return; }
-  if (files.length !== ordered.length) {
-    say(`ფოტოების რაოდენობა (${files.length}) პროდუქტების რაოდენობას (${ordered.length}) უნდა ემთხვეოდეს.`); return;
+  if (!productsLoaded || !ordered.length) {
+    const message = "ჯერ დაელოდე პროდუქტების ჩატვირთვას.";
+    $("bulkPhotoHint").textContent = message; say(message); return;
   }
-  photoPairs = ordered.map((product,index) => ({ id:product.id, name:product.name, file:files[index] }));
-  for (const pair of photoPairs) $("bulkPhotoPreview").append(element("p", `${pair.name} ← ${pair.file.name}`));
-  $("saveBulkPhotos").disabled = false;
-  say(`${files.length} ფოტო მზადაა. გადაამოწმე შესაბამისობა და შეინახე.`);
+  if (!files.length) {
+    const message = "საქაღალდეში JPEG, PNG ან WebP ფოტოები ვერ ვიპოვე.";
+    $("bulkPhotoHint").textContent = message; say(message); return;
+  }
+  if (files.length === ordered.length) {
+    photoPairs = ordered.map((product,index) => ({ id:product.id, name:product.name, file:files[index] }));
+    for (const pair of photoPairs) $("bulkPhotoPreview").append(element("p", `${pair.name} ← ${pair.file.name}`));
+    $("saveBulkPhotos").disabled = false;
+    $("bulkPhotoHint").textContent = `${files.length} ფოტო ავტომატურად მიება პროდუქტებს. გადაამოწმე და შეინახე.`;
+    say(`${files.length} ფოტო მზადაა. გადაამოწმე შესაბამისობა და შეინახე.`);
+    return;
+  }
+  photoPairs = files.map(file => ({ id:"", name:"", file }));
+  for (const pair of photoPairs) {
+    const row = element("div", undefined, "photo-map-row");
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `${pair.file.name} — პროდუქტის არჩევა`);
+    select.add(new Option("აირჩიე პროდუქტი", ""));
+    for (const product of ordered) select.add(new Option(product.name, product.id));
+    select.onchange = () => {
+      pair.id = select.value;
+      pair.name = products.get(pair.id)?.name || "";
+      updateBulkPhotoMappingState();
+    };
+    row.append(element("span", pair.file.name, "muted"), select);
+    $("bulkPhotoPreview").append(row);
+  }
+  $("bulkPhotoHint").textContent = `ფოტოებია ${files.length}, პროდუქტია ${ordered.length}. მიუთითე თითოეული ფოტოს კერძი. გამოტოვებული ფოტოები არ შეინახება.`;
+  say("რაოდენობები განსხვავდება. ფოტოები პროდუქტებს ხელით მიაბი.");
 };
 $("saveBulkPhotos").onclick = async () => {
   if (savingPhotos) { say("ფოტოების შენახვა უკვე მიმდინარეობს."); return; }
   if (stopped) { say("სესია დასრულდა. განაახლე გვერდი და სცადე თავიდან."); return; }
-  if (!photoPairs.length) {
+  const selectedPairs = photoPairs.filter(pair => pair.id);
+  if (!selectedPairs.length) {
     say("ფოტოები დასამუშავებლად მზად არ არის. ხელახლა აირჩიე საქაღალდე და გადაამოწმე რაოდენობა.");
+    return;
+  }
+  if (new Set(selectedPairs.map(pair => pair.id)).size !== selectedPairs.length) {
+    say("ერთი პროდუქტი მხოლოდ ერთ ფოტოს მიაბი.");
     return;
   }
   savingPhotos = true;
   $("saveBulkPhotos").disabled = true;
+  $("saveBulkPhotos").textContent = "ინახება…";
   $("bulkPhotoFiles").disabled = true;
   let saved = 0;
   try {
-    const total = photoPairs.length;
-    for (const [index, pair] of photoPairs.entries()) {
+    const total = selectedPairs.length;
+    for (const [index, pair] of selectedPairs.entries()) {
       if (!products.has(pair.id) || products.get(pair.id).name !== pair.name) throw Error("პროდუქტები შეიცვალა. ფოტოები თავიდან აირჩიე.");
       if (stopped) throw Error("სესია დასრულდა.");
       setPhotoProgress("bulk", saved / total * 100, `ვამზადებ ფოტოს ${index + 1} / ${total} · ${pair.name}`);
       const imageUrl = await encodeProductPhoto(pair.file);
       await updateDoc(doc(menuRef,pair.id), { imageUrl, imagePath:"", updatedAt:serverTimestamp() });
       saved++;
-      setPhotoProgress("bulk", saved / total * 100, `შენახულია ${saved} / ${total} · შემდეგი: ${photoPairs[index + 1]?.name || "დასრულება"}`, saved === total ? "complete" : "working");
+      setPhotoProgress("bulk", saved / total * 100, `შენახულია ${saved} / ${total} · შემდეგი: ${selectedPairs[index + 1]?.name || "დასრულება"}`, saved === total ? "complete" : "working");
       say(`ინახება ფოტოები: ${saved} / ${total}`);
     }
     photoPairs = [];
     $("bulkPhotoFiles").value = "";
     $("bulkPhotoPreview").replaceChildren();
     setPhotoProgress("bulk", 100, `შენახულია ${saved} / ${saved} ფოტო`, "complete");
-    say(`შენახულია ${saved} ფოტო უკუმიმართულებით.`);
+    $("bulkPhotoHint").textContent = `${saved} ფოტო შენახულია.`;
+    say(`შენახულია ${saved} ფოტო.`);
   } catch (error) {
     const progress = $("bulkPhotoProgress");
     setPhotoProgress("bulk", progress.value, `ატვირთვა შეჩერდა: ${error.message}`, "error");
@@ -104,7 +147,8 @@ $("saveBulkPhotos").onclick = async () => {
   } finally {
     savingPhotos = false;
     $("bulkPhotoFiles").disabled = false;
-    $("saveBulkPhotos").disabled = !photoPairs.length;
+    $("saveBulkPhotos").textContent = "ფოტოების შენახვა";
+    updateBulkPhotoMappingState();
   }
 };
 function renderTheme(color = DEFAULT_THEME_COLOR) {

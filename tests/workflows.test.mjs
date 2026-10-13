@@ -261,6 +261,24 @@ test("bulk photo upload advances through preparation and save",async()=>{
   assert.ok(["a","b"].every(id=>/^data:image\/jpeg/.test(h.database.get(`restaurants/test/menu/${id}`).imageUrl)));
 });
 
+test("bulk photo upload allows explicit mapping when folder and product counts differ",async()=>{
+  const h=setup("dashboard.js","dashboard.html",{
+    "restaurants/test":{tableCount:2},
+    "restaurants/test/menu/a":{name:"ა კერძი",price:10},
+    "restaurants/test/menu/b":{name:"ბ კერძი",price:11}
+  });await h.settle();h.publish("restaurants/test/menu");
+  h.nodes.get("bulkPhotoFiles").files=[{name:"one.jpg",type:"image/jpeg",size:1024}];
+  h.nodes.get("bulkPhotoFiles").onchange();
+  assert.equal(h.nodes.get("saveBulkPhotos").disabled,true);
+  assert.match(h.nodes.get("bulkPhotoHint").textContent,/ფოტოებია 1, პროდუქტია 2/);
+  const mapping=h.nodes.get("bulkPhotoPreview").children[0].children[1];
+  mapping.value="b";mapping.onchange();
+  assert.equal(h.nodes.get("saveBulkPhotos").disabled,false);
+  await h.nodes.get("saveBulkPhotos").onclick();
+  assert.equal(h.database.get("restaurants/test/menu/a").imageUrl,undefined);
+  assert.match(h.database.get("restaurants/test/menu/b").imageUrl,/^data:image\/jpeg/);
+});
+
 test("bulk photo save explains why it cannot start without a prepared folder",async()=>{
   const h=setup("dashboard.js","dashboard.html",{"restaurants/test":{tableCount:1}});await h.settle();
   await h.nodes.get("saveBulkPhotos").onclick();
