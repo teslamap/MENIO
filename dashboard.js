@@ -19,7 +19,7 @@ function renderTheme(color = DEFAULT_THEME_COLOR) {
   const luminance=.2126*linear(channels[0])+.7152*linear(channels[1])+.0722*linear(channels[2]);
   $("themeColor").value = safeColor;
   $("themeColorValue").textContent = safeColor.toUpperCase();
-  $("themePreview").style?.setProperty?.("--accent-color", safeColor);
+  $("themePreview").style?.setProperty?.("--accent-color", "#d7ff64");
   $("themePreview").style?.setProperty?.("--menu-background-color", safeColor);
   $("themePreview").style?.setProperty?.("--menu-foreground-color", luminance>.42?"#171920":"#f5f5f7");
 }
