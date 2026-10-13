@@ -1,5 +1,5 @@
 import {
-  auth, db, doc, getDoc, collection, setDoc, updateDoc, deleteDoc,
+  auth, db, doc, getDoc, collection, setDoc, updateDoc, deleteDoc, writeBatch,
   onSnapshot, runTransaction, serverTimestamp, onAuthStateChanged, signOut
 } from "./firebase.js";
 import { requireOwner } from "./app.js";
@@ -9,8 +9,30 @@ const $ = id => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get("restaurant");
 const products = new Map(), categories = new Map(), tables = new Map();
 const unsubscribers = [];
-let imageObjectURL, stopped = false;
+let imageObjectURL, stopped = false, productsLoaded = false, categoriesLoaded = false, pendingMenuImport = [];
 const DEFAULT_THEME_COLOR = "#f97316";
+const MENU_IMPORT_CATEGORIES = new Set(["ბურგერი","ქათმის ხორცი","საქონლის ხორცი","ღორის ხორცი","კრევეტები","ზღვის პროდუქტები","ვეგეტარიანული","ხაჭაპური","პიცა","პასტა","სუში","სალათი","წვნინანები","სენდვიჩი","სნექი","გამაგრილებელი სასმელი","იაპონური ლიმონათი","ყავა","ლუდი","საკე","კორეული არაყი","ვისკი","დანამატი"]);
+function parseMenuImport(text) {
+  const lines = text.replace(/\r/g, "").split("\n").map(line => line.trim());
+  const products = []; let category = "", block = [];
+  for (const line of lines) {
+    if (line === "დამატება") { block = []; continue; }
+    const price = line.match(/^(\d+(?:[.,]\d+)?)\s*GEL$/i);
+    if (!price) { if (line) block.push(line); continue; }
+    const lastCategory = block.findLastIndex(value => MENU_IMPORT_CATEGORIES.has(value));
+    const details = block.slice(lastCategory + 1).filter(value => !MENU_IMPORT_CATEGORIES.has(value));
+    if (lastCategory >= 0) category = block[lastCategory];
+    const name = details[0] || "", description = details.slice(1).join(" ").replace(/\s+/g, " ").trim();
+    const amount = Number(price[1].replace(",", "."));
+    if (!category || !name || name.length > 120 || description.length > 2000 || !Number.isFinite(amount) || amount <= 0 || amount > 100000)
+      throw Error("მენიუს ტექსტში პროდუქტის სახელი, კატეგორია ან ფასი ვერ ამოვიცანი. შეამოწმე წყარო.");
+    products.push({ name, description, price: Math.round(amount * 100) / 100, category });
+    block = [];
+  }
+  if (!products.length) throw Error("ფასიანი კერძები ვერ ვიპოვე. ატვირთე მენიუს ტექსტის .txt ფაილი.");
+  if (products.length > 450) throw Error("ერთ ჯერზე მაქსიმუმ 450 კერძის იმპორტია შესაძლებელი.");
+  return products;
+}
 const say = message => { $("businessMessage").textContent = message; };
 function renderTheme(color = DEFAULT_THEME_COLOR) {
   const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_THEME_COLOR;
@@ -42,11 +64,11 @@ function action(label, callback, className = "secondary small-button") {
   };
   return button;
 }
-function listen(reference, target, render) {
+function listen(reference, target, render, markLoaded = () => {}) {
   unsubscribers.push(onSnapshot(reference, snapshot => {
     target.clear();
     snapshot.forEach(record => target.set(record.id, { ...record.data(), id: record.id }));
-    render();
+    render(); markLoaded();
   }, error => say("მონაცემების წაკითხვა ვერ მოხერხდა: " + error.message)));
 }
 function resetProduct() {
@@ -220,6 +242,80 @@ $("appearanceNavLink").onclick = event => { event.preventDefault(); $("appearanc
 $("closeAppearanceDialog").onclick = () => $("appearanceDialog").close();
 $("tablesNavLink").onclick = event => { event.preventDefault(); $("tableDialog").showModal(); };
 $("closeTableDialog").onclick = () => $("tableDialog").close();
+$("menuImportFile").onchange = async event => {
+  pendingMenuImport = [];
+  try {
+    const file = event.target.files[0];
+    if (!file) throw Error("აირჩიე მენიუს .txt ფაილი.");
+    if (file.size > 5 * 1024 * 1024) throw Error("მენიუს ტექსტის ფაილი 5 MB-ზე ნაკლები უნდა იყოს.");
+    pendingMenuImport = parseMenuImport(await file.text());
+    const groupCount = new Set(pendingMenuImport.map(product => product.category)).size;
+    $("menuImportSummary").textContent = `${pendingMenuImport.length} კერძი · ${groupCount} კატეგორია · ფოტოები არ არის საჭირო`;
+    $("menuImportPreview").replaceChildren(...pendingMenuImport.slice(0, 5).map(product =>
+      element("p", `${product.category} · ${product.name} · ${product.price.toFixed(2)} ₾`, "muted")));
+    if (pendingMenuImport.length > 5) $("menuImportPreview").append(element("p", `და კიდევ ${pendingMenuImport.length - 5} კერძი`, "muted"));
+    $("importMenuSubmit").disabled = false;
+    say("გადაამოწმე იმპორტის რაოდენობა და შემდეგ დააჭირე დამატებას.");
+  } catch(error) {
+    $("menuImportSummary").textContent = ""; $("menuImportPreview").replaceChildren();
+    $("importMenuSubmit").disabled = true; say(error.message);
+  }
+};
+$("importMenuSubmit").onclick = async () => {
+  const button = $("importMenuSubmit");
+  if (!productsLoaded || !categoriesLoaded) { say("რესტორნის მენიუ იტვირთება. სცადე რამდენიმე წამში."); return; }
+  if (!pendingMenuImport.length) return;
+  const proceed = confirm(`დაემატოს ${pendingMenuImport.length} კერძი ფოტოების გარეშე? უკვე არსებული კერძები გამოტოვდება.`);
+  if (!proceed) return;
+  button.disabled = true;
+  try {
+    const categoryIds = new Map([...categories.values()].map(item => [item.name.trim().toLocaleLowerCase("ka"), item.id]));
+    const categoryBatch = writeBatch(db), newCategories = [];
+    for (const name of new Set(pendingMenuImport.map(item => item.category))) {
+      const key = name.toLocaleLowerCase("ka");
+      if (categoryIds.has(key)) continue;
+      const ref = doc(categoryRef); categoryIds.set(key, ref.id); newCategories.push({ ref, name });
+      categoryBatch.set(ref, { name, createdAt: serverTimestamp() });
+    }
+    if (newCategories.length) {
+      await categoryBatch.commit();
+      for (const item of newCategories) categories.set(item.ref.id, { id:item.ref.id, name:item.name });
+    }
+    const existing = new Set(), productsByCategory = new Map();
+    const productKey = (name, categoryId) => `${categoryId}\u0000${name.trim().toLocaleLowerCase("ka")}`;
+    for (const item of products.values()) {
+      const categoryName = categories.get(item.categoryId)?.name || item.category || "";
+      existing.add(productKey(item.name, item.categoryId || categoryName));
+      if (categoryName) existing.add(productKey(item.name, categoryName));
+    }
+    let added = 0, skipped = 0;
+    for (const item of pendingMenuImport) {
+      const categoryId = categoryIds.get(item.category.toLocaleLowerCase("ka"));
+      const key = productKey(item.name, categoryId);
+      if (existing.has(key) || existing.has(productKey(item.name, item.category))) { skipped++; continue; }
+      existing.add(key);
+      if (!productsByCategory.has(categoryId)) productsByCategory.set(categoryId, []);
+      productsByCategory.get(categoryId).push({ ref:doc(menuRef), data:{ name:item.name, price:item.price, description:item.description,
+        category:"", categoryId, imageUrl:"", imagePath:"", active:true,
+        createdAt:serverTimestamp(), updatedAt:serverTimestamp() } });
+      added++;
+    }
+    const categoryGroups = [...productsByCategory.values()];
+    for (let start=0; start<categoryGroups.length; start+=10) {
+      const productBatch = writeBatch(db);
+      const groupChunk = categoryGroups.slice(start,start+10);
+      for (const group of groupChunk)
+        for (const product of group) productBatch.set(product.ref,product.data);
+      await productBatch.commit();
+      for (const group of groupChunk) for (const product of group) products.set(product.ref.id,{...product.data,id:product.ref.id});
+    }
+    renderProducts();
+    say(`იმპორტი დასრულდა: დაემატა ${added} კერძი, გამოტოვებულია ${skipped} არსებული კერძი.`);
+    pendingMenuImport = []; $("menuImportSummary").textContent = ""; $("menuImportPreview").replaceChildren();
+    $("menuImportFile").value = ""; $("importMenuSubmit").disabled = true;
+  } catch(error) { say("იმპორტი ვერ დასრულდა: " + error.message); }
+  finally { button.disabled = !pendingMenuImport.length; }
+};
 $("themeColor").oninput = event => renderTheme(event.target.value);
 $("saveTheme").onclick = async () => {
   const button = $("saveTheme"); button.disabled = true;
@@ -300,8 +396,8 @@ onAuthStateChanged(auth,async user => {
     renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);
     $("merchantLink").href="merchant.html?restaurant="+encodeURIComponent(slug);
     $("dashboardContent").hidden=false;
-    listen(menuRef,products,() => { renderProducts(); renderCategories(); });
-    listen(categoryRef,categories,renderCategories);
+    listen(menuRef,products,() => { renderProducts(); renderCategories(); },() => { productsLoaded = true; });
+    listen(categoryRef,categories,renderCategories,() => { categoriesLoaded = true; });
     listen(tableRef,tables,renderTables);
   } catch(error) { say(error.message); }
 });
