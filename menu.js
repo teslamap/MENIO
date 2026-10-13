@@ -74,7 +74,7 @@ async function init(){
   if(!rs.exists() || !rs.data().active || !ts.exists() || !ts.data().active)throw Error("რესტორანი ან მაგიდა მიუწვდომელია");
   restaurant=rs.data();$("restaurantName").textContent=restaurant.name;
   const themeColor=typeof restaurant.themeColor==="string" && /^#[0-9a-f]{6}$/i.test(restaurant.themeColor) ? restaurant.themeColor : DEFAULT_THEME_COLOR;
-  document.documentElement.style.setProperty("--accent-color",themeColor);
+  document.documentElement?.style?.setProperty?.("--accent-color",themeColor);
   $("tableInfo").textContent="მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
   unsubscribers.push(onSnapshot(collection(db,"restaurants",slug,"categories"),snapshot=>{
     categories.clear();snapshot.forEach(d=>categories.set(d.id,d.data()));renderTabs();render();

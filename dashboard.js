@@ -16,7 +16,7 @@ function renderTheme(color = DEFAULT_THEME_COLOR) {
   const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_THEME_COLOR;
   $("themeColor").value = safeColor;
   $("themeColorValue").textContent = safeColor.toUpperCase();
-  $("themePreview").style.setProperty("--accent-color", safeColor);
+  $("themePreview").style?.setProperty?.("--accent-color", safeColor);
 }
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
