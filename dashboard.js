@@ -34,6 +34,53 @@ function parseMenuImport(text) {
   return products;
 }
 const say = message => { $("businessMessage").textContent = message; };
+let photoPairs = [], savingPhotos = false;
+$("bulkPhotoFiles").onchange = () => {
+  photoPairs = [];
+  $("bulkPhotoPreview").replaceChildren();
+  $("saveBulkPhotos").disabled = true;
+  const files = [...$("bulkPhotoFiles").files].filter(file => /\.(jpe?g|png|webp)$/i.test(file.name))
+    .sort((a,b) => a.name.localeCompare(b.name, "en", { numeric:true })).reverse();
+  const ordered = [...products.values()].sort((a,b) => a.name.localeCompare(b.name, "ka"));
+  if (!productsLoaded || !ordered.length) { say("ჯერ დაელოდე პროდუქტების ჩატვირთვას."); return; }
+  if (files.length !== ordered.length) {
+    say(`ფოტოების რაოდენობა (${files.length}) პროდუქტების რაოდენობას (${ordered.length}) უნდა ემთხვეოდეს.`); return;
+  }
+  photoPairs = ordered.map((product,index) => ({ id:product.id, name:product.name, file:files[index] }));
+  for (const pair of photoPairs) $("bulkPhotoPreview").append(element("p", `${pair.name} ← ${pair.file.name}`));
+  $("saveBulkPhotos").disabled = false;
+  say(`${files.length} ფოტო მზადაა. გადაამოწმე შესაბამისობა და შეინახე.`);
+};
+$("saveBulkPhotos").onclick = async () => {
+  if (savingPhotos || !photoPairs.length || stopped) return;
+  savingPhotos = true;
+  $("saveBulkPhotos").disabled = true;
+  $("bulkPhotoFiles").disabled = true;
+  let saved = 0;
+  try {
+    const prepared = [];
+    for (const pair of photoPairs) {
+      if (!products.has(pair.id) || products.get(pair.id).name !== pair.name) throw Error("პროდუქტები შეიცვალა. ფოტოები თავიდან აირჩიე.");
+      prepared.push({ ...pair, imageUrl:await encodeProductPhoto(pair.file) });
+    }
+    for (const pair of prepared) {
+      if (stopped) throw Error("სესია დასრულდა.");
+      await updateDoc(doc(menuRef,pair.id), { imageUrl:pair.imageUrl, imagePath:"", updatedAt:serverTimestamp() });
+      saved++;
+      say(`ინახება ფოტოები: ${saved} / ${prepared.length}`);
+    }
+    photoPairs = [];
+    $("bulkPhotoFiles").value = "";
+    $("bulkPhotoPreview").replaceChildren();
+    say(`შენახულია ${saved} ფოტო უკუმიმართულებით.`);
+  } catch (error) {
+    say(`შენახულია ${saved} ფოტო. ${error.message}`);
+  } finally {
+    savingPhotos = false;
+    $("bulkPhotoFiles").disabled = false;
+    $("saveBulkPhotos").disabled = !photoPairs.length;
+  }
+};
 function renderTheme(color = DEFAULT_THEME_COLOR) {
   const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_THEME_COLOR;
   const hex=safeColor.slice(1), channels=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16));
@@ -405,4 +452,3 @@ window.addEventListener("pagehide",() => {
   stopped=true; unsubscribers.forEach(unsubscribe => unsubscribe());
   if(imageObjectURL) URL.revokeObjectURL(imageObjectURL);
 });
-
