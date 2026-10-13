@@ -15,5 +15,11 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "menu",
+      "fieldPath": "imageUrl",
+      "indexes": []
+    }
+  ]
 }

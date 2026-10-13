@@ -23,7 +23,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
   const snap=key=>({exists:()=>database.has(key),data:()=>database.get(key)});
   const auth={currentUser:user},location={search:"?restaurant=test&table=1",href:"https://menio.example/dashboard.html",replace(url){this.href=url;}};
   const api={
-    auth,db:{},storage:{},location,URL,URLSearchParams,console,queueMicrotask,crypto:{randomUUID:()=>"image"},
+    auth,db:{},location,URL,URLSearchParams,console,queueMicrotask,crypto:{randomUUID:()=>"image"},
     document:{getElementById:id=>nodes.get(id)||null,createElement:()=>new Element()},
     window:{addEventListener(){}},Option:class extends Element{constructor(text,value){super();this.value=value;this.textContent=text;}},
     navigator:{clipboard:{writeText:async()=>{}}},confirm:()=>true,prompt:()=>{},
@@ -46,7 +46,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
     signInWithEmailAndPassword:async(auth,email)=>{signIns++;auth.currentUser={uid:"owner",email,isAnonymous:false};return {user:auth.currentUser};},
     createUserWithEmailAndPassword:async(auth,email)=>{created++;auth.currentUser={uid:"owner",email,isAnonymous:false};return {user:auth.currentUser};},
     signInAnonymously:async auth=>{auth.currentUser={uid:"guest",isAnonymous:true};},
-    addDoc:async()=>{},ref:(storage,path)=>({path}),uploadBytes:async()=>{},getDownloadURL:async()=>"https://example.com/image.jpg",deleteObject:async()=>{}
+    addDoc:async()=>{}, safeImage:value=>value || "",safeProductImage:value=>value || "",encodeProductPhoto:async()=>"data:image/jpeg;base64,/9j/2Q=="
   };
   vm.createContext(api);
   vm.runInContext(fs.readFileSync(path.join(root,js),"utf8")
@@ -129,5 +129,28 @@ test("guest cart updates changed prices and removes unavailable products",async(
   assert.equal(h.nodes.get("total").textContent,"3.00 ₾");
   h.database.get("restaurants/test/menu/water").active=false;h.publish("restaurants/test/menu");
   assert.equal(h.nodes.get("total").textContent,"0.00 ₾");assert.equal(h.nodes.get("sendOrder").disabled,true);
+});
+
+test("product photos save, replace and remove atomically in the product document",async()=>{
+  const h=setup("dashboard.js","dashboard.html");await h.settle();
+  h.nodes.get("dishName").value="Photo dish";h.nodes.get("dishPrice").value="12";
+  h.nodes.get("dishActive").checked=true;h.nodes.get("dishImage").files=[{type:"image/jpeg",size:1000}];
+  await h.submit("dishForm");
+  const key=[...h.database.keys()].find(k=>k.includes("/menu/"));
+  assert.equal(h.database.get(key).imageUrl,"data:image/jpeg;base64,/9j/2Q==");
+  h.publish("restaurants/test/menu");
+  let actions=h.nodes.get("dishes").children[0].children.at(-1);
+  await actions.children[0].onclick();
+  h.nodes.get("dishImage").files=[];h.nodes.get("removeImage").checked=true;
+  await h.submit("dishForm");
+  assert.equal(h.database.get(key).imageUrl,"");
+});
+test("guest menu displays Firestore photo data without Firebase Storage",async()=>{
+  const photo="data:image/jpeg;base64,/9j/2Q==";
+  const h=setup("menu.js","menu.html",{
+    "restaurants/test":{name:"Test",active:true},"restaurants/test/tables/1":{number:1,active:true},
+    "restaurants/test/menu/photo":{name:"Photo dish",price:12,active:true,imageUrl:photo}
+  },null);await h.settle();h.publish("restaurants/test/menu");
+  assert.equal(h.nodes.get("menu").children[0].children[0].src,photo);
 });
 

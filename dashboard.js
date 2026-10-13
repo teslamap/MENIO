@@ -1,25 +1,21 @@
 import {
-  auth, db, storage, doc, getDoc, collection, setDoc, updateDoc, deleteDoc,
-  onSnapshot, runTransaction, serverTimestamp, onAuthStateChanged, signOut,
-  ref, uploadBytes, getDownloadURL, deleteObject
+  auth, db, doc, getDoc, collection, setDoc, updateDoc, deleteDoc,
+  onSnapshot, runTransaction, serverTimestamp, onAuthStateChanged, signOut
 } from "./firebase.js";
 import { requireOwner } from "./app.js";
+import { safeProductImage as safeImage, encodeProductPhoto } from "./image-utils.js";
 
 const $ = id => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get("restaurant");
 const products = new Map(), categories = new Map(), tables = new Map();
 const unsubscribers = [];
-let imageObjectURL, currentEditImage = "", stopped = false;
+let imageObjectURL, stopped = false;
 const say = message => { $("businessMessage").textContent = message; };
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
   if (className) node.className = className;
   return node;
-};
-const safeImage = value => {
-  try { const url = new URL(value); return url.protocol === "https:" ? url.href : ""; }
-  catch { return ""; }
 };
 const menuRef = collection(db, "restaurants", slug || "_", "menu");
 const categoryRef = collection(db, "restaurants", slug || "_", "categories");
@@ -44,7 +40,6 @@ function listen(reference, target, render) {
 function resetProduct() {
   $("dishForm").reset();
   $("dishId").value = "";
-  currentEditImage = "";
   if (imageObjectURL) URL.revokeObjectURL(imageObjectURL);
   imageObjectURL = undefined;
   $("imagePreview").hidden = true;
@@ -60,7 +55,6 @@ function fillProduct(product) {
   $("dishDescription").value = product.description || "";
   $("dishCategory").value = product.categoryId || "";
   $("dishActive").checked = product.active !== false;
-  currentEditImage = product.imagePath || "";
   if (safeImage(product.imageUrl)) {
     $("imagePreview").src = safeImage(product.imageUrl);
     $("imagePreview").hidden = false;
@@ -99,7 +93,6 @@ function renderProducts() {
         if (!confirm("წაიშალოს „" + product.name + "“?")) return;
         await deleteDoc(doc(menuRef, product.id));
         if ($("dishId").value === product.id) resetProduct();
-        if (product.imagePath) await cleanupImage(product.imagePath);
         say("პროდუქტი წაიშალა.");
       }, "danger small-button"));
     card.append(actions); $("dishes").append(card);
@@ -198,27 +191,6 @@ function renderTables() {
     card.append(open,actions); $("tableList").append(card);
   }
 }
-async function cleanupImage(path) {
-  if (!path.startsWith("restaurants/" + slug + "/products/")) return;
-  try { await deleteObject(ref(storage,path)); }
-  catch(error) { if(error.code !== "storage/object-not-found") console.warn("Image cleanup failed", error.code); }
-}
-async function compressImage(file) {
-  if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 5*1024*1024) {
-    throw Error("აირჩიე JPEG, PNG ან WebP ფოტო, მაქსიმუმ 5 MB.");
-  }
-  const bitmap = await createImageBitmap(file);
-  try {
-    const scale = Math.min(1,1200/Math.max(bitmap.width,bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width=Math.max(1,Math.round(bitmap.width*scale)); canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-    const context=canvas.getContext("2d");
-    context.fillStyle="#fff"; context.fillRect(0,0,canvas.width,canvas.height);
-    context.drawImage(bitmap,0,0,canvas.width,canvas.height);
-    return await new Promise((resolve,reject) => canvas.toBlob(
-      blob => blob ? resolve(blob) : reject(Error("ფოტოს დამუშავება ვერ მოხერხდა.")), "image/jpeg", .85));
-  } finally { bitmap.close(); }
-}
 $("dishImage").onchange = () => {
   if (imageObjectURL) URL.revokeObjectURL(imageObjectURL);
   const file = $("dishImage").files[0];
@@ -234,7 +206,6 @@ $("cancelCategory").onclick = resetCategory;
 $("productFilter").onchange = renderProducts;
 $("dishForm").onsubmit = async event => {
   event.preventDefault(); const button=$("saveDish"); button.disabled=true;
-  let uploadedPath="", committed=false;
   try {
     const id=$("dishId").value, existing=id ? products.get(id) : null;
     if (id && !existing) throw Error("პროდუქტი უკვე წაშლილია.");
@@ -242,25 +213,17 @@ $("dishForm").onsubmit = async event => {
     if (!name || !Number.isFinite(price) || price<=0 || price>100000) throw Error("შეამოწმე პროდუქტის სახელი და ფასი.");
     if (categoryId && !categories.has(categoryId)) throw Error("აირჩიე არსებული კატეგორია.");
     const productDoc=id ? doc(menuRef,id) : doc(menuRef);
-    let imageUrl=existing?.imageUrl || "", imagePath=existing?.imagePath || "";
-    if ($("removeImage").checked) { imageUrl=""; imagePath=""; }
+    let imageUrl=existing?.imageUrl || "";
+    if ($("removeImage").checked) imageUrl="";
     const file=$("dishImage").files[0];
-    if (file) {
-      const blob=await compressImage(file);
-      uploadedPath="restaurants/"+slug+"/products/"+productDoc.id+"/"+crypto.randomUUID()+".jpg";
-      await uploadBytes(ref(storage,uploadedPath),blob,{contentType:"image/jpeg"});
-      imageUrl=await getDownloadURL(ref(storage,uploadedPath)); imagePath=uploadedPath;
-    }
+    if (file) imageUrl=await encodeProductPhoto(file);
     const data={ name,price:Math.round(price*100)/100,description:$("dishDescription").value.trim(),category:"",
-      categoryId,imageUrl,imagePath,active:$("dishActive").checked,updatedAt:serverTimestamp() };
+      categoryId,imageUrl,imagePath:"",active:$("dishActive").checked,updatedAt:serverTimestamp() };
     if (existing) await updateDoc(productDoc,data);
     else await setDoc(productDoc,{...data,createdAt:serverTimestamp()});
-    committed=true;
-    if (currentEditImage && currentEditImage!==imagePath) await cleanupImage(currentEditImage);
     resetProduct(); say(existing ? "პროდუქტი განახლდა." : "პროდუქტი დაემატა.");
   } catch(error) {
-    if (uploadedPath && !committed) await cleanupImage(uploadedPath);
-    say(error.code?.startsWith("storage/") ? "ფოტოს ატვირთვა ვერ მოხერხდა. შეამოწმე Firebase Storage-ის ჩართვა და წვდომის წესები." : "შეცდომა: "+error.message);
+    say("შეცდომა: "+error.message);
   } finally { button.disabled=false; }
 };
 $("categoryForm").onsubmit = async event => {

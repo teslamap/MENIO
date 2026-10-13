@@ -6,17 +6,14 @@ const firebaseConfig={
   apiKey:"AIzaSyDghOTPxpYXBGijyZMJTL3SxTazB881YMo",
   authDomain:"menio-8de8f.firebaseapp.com",
   projectId:"menio-8de8f",
-  storageBucket:"menio-8de8f.firebasestorage.app",
   messagingSenderId:"429553713786",
   appId:"1:429553713786:web:bf1325a209c917bd4db1c3",
   measurementId:"G-GYH32VBGTV"
 };
 
-import {getStorage,ref,uploadBytes,getDownloadURL,deleteObject} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js";
 const app=initializeApp(firebaseConfig);
 export const auth=getAuth(app);
 export const db=getFirestore(app);
-export const storage=getStorage(app);
-export {deleteDoc,writeBatch,ref,uploadBytes,getDownloadURL,deleteObject};
+export {deleteDoc,writeBatch};
 export{createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously,doc,getDoc,getDocs,setDoc,addDoc,collection,query,where,orderBy,onSnapshot,updateDoc,serverTimestamp,runTransaction};
 

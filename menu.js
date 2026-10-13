@@ -1,4 +1,5 @@
 import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAnonymously,onAuthStateChanged} from "./firebase.js";
+import { safeProductImage } from "./image-utils.js";
 const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table"));
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false;
@@ -24,14 +25,10 @@ function render(){
   if(!visible.length){$("menu").textContent="მენიუ ჯერ არ არის დამატებული";return;}
   for(const dish of visible){
     const card=el("article",undefined,"dish-card");
-    if(dish.imageUrl){
-      try{
-        const url=new URL(dish.imageUrl);
-        if(url.protocol==="https:"){
-          const image=el("img",undefined,"dish-photo");image.src=url.href;image.alt=dish.name;image.loading="lazy";
-          image.onerror=()=>image.hidden=true;card.append(image);
-        }
-      }catch{}
+    const photo = safeProductImage(dish.imageUrl);
+    if(photo){
+      const image=el("img",undefined,"dish-photo");image.src=photo;image.alt=dish.name;image.loading="lazy";
+      image.onerror=()=>image.hidden=true;card.append(image);
     }
     card.append(el("span",groupName(dish),"muted"),el("h3",dish.name),el("p",dish.description || ""));
     const row=el("div",undefined,"row"),button=el("button","დამატება +");

@@ -75,7 +75,9 @@ service cloud.firestore {
           && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == ''
             || exists(/databases/$(database)/documents/restaurants/$(slug)/categories/$(request.resource.data.categoryId)))
           && (!('imageUrl' in request.resource.data) || (request.resource.data.imageUrl is string
-            && request.resource.data.imageUrl.size() <= 2048))
+            && ((request.resource.data.imageUrl.size() <= 2048 && (request.resource.data.imageUrl == '' || request.resource.data.imageUrl.matches('https://.*')))
+              || (request.resource.data.imageUrl.size() <= 180000
+                && request.resource.data.imageUrl.matches('data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}')))))
           && (!('imagePath' in request.resource.data) || request.resource.data.imagePath is string);
         allow delete: if owns(slug);
       }

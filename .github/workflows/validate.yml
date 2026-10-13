@@ -31,14 +31,14 @@ jobs:
             node --input-type=module --check < "$file"
           done
       - name: Test restaurant and guest workflows
-        run: node --test tests/workflows.test.mjs
+        run: node --test tests/*.test.mjs
       - name: Check local assets and JavaScript module exports
         run: python tests/check-assets.py
       - name: Ensure Firebase config has no placeholders
         run: |
           ! grep -Eq 'YOUR_API_KEY|YOUR_PROJECT_ID|YOUR_PROJECT\.firebaseapp\.com' firebase.js
-      - name: Validate Firestore and Storage rules with the emulators
+      - name: Validate Firestore rules with the emulator
         run: |
           npm install --global firebase-tools
-          firebase emulators:exec --only firestore,storage --project demo-menio --non-interactive "echo Firestore and Storage rules compiled successfully"
+          firebase emulators:exec --only firestore --project demo-menio --non-interactive "echo Firestore rules compiled successfully"
 
