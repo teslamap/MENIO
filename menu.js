@@ -42,9 +42,9 @@ function render(){
   }
 }
 function drawCart(){
-  $("cart").replaceChildren();let total=0;
+  $("cart").replaceChildren();let total=0,count=0;
   for(const item of cart.values()){
-    total+=item.price*item.quantity;
+    total+=item.price*item.quantity;count+=item.quantity;
     const row=el("div",undefined,"cart-row"),button=el("button","−","secondary small-button");
     button.disabled=sending;button.setAttribute("aria-label",item.name+" — რაოდენობის შემცირება");
     button.onclick=()=>{item.quantity--;if(item.quantity<=0)cart.delete(item.dishId);drawCart();};
@@ -52,7 +52,7 @@ function drawCart(){
     $("cart").append(row);
   }
   if(!cart.size)$("cart").textContent="ჯერ კერძები არ აგირჩევია";
-  $("total").textContent=money(total);$("sendOrder").disabled=!ready || sending || !cart.size;
+  $("total").textContent=money(total);$("cartItemCount").textContent=count;$("cartSummaryTotal").textContent=money(total);$("sendOrder").disabled=!ready || sending || !cart.size;
 }
 function reconcileCart(){
   let changed=false;
