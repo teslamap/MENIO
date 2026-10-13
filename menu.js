@@ -4,6 +4,14 @@ const params=new URLSearchParams(location.search),slug=params.get("restaurant"),
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false;
 const DEFAULT_THEME_COLOR="#f97316";
+function applyMenuTheme(color){
+  const hex=color.slice(1), red=parseInt(hex.slice(0,2),16), green=parseInt(hex.slice(2,4),16), blue=parseInt(hex.slice(4,6),16);
+  const linear=value=>{value/=255;return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4;};
+  const luminance=.2126*linear(red)+.7152*linear(green)+.0722*linear(blue);
+  document.documentElement?.style?.setProperty?.("--accent-color",color);
+  document.documentElement?.style?.setProperty?.("--menu-background-color",color);
+  document.documentElement?.style?.setProperty?.("--menu-foreground-color",luminance>.42?"#171920":"#f5f5f7");
+}
 const money=n=>Number(n).toFixed(2)+" ₾";
 const say=text=>{ $("message").textContent=text; };
 const el=(tag,text,className)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;};
@@ -74,7 +82,7 @@ async function init(){
   if(!rs.exists() || !rs.data().active || !ts.exists() || !ts.data().active)throw Error("რესტორანი ან მაგიდა მიუწვდომელია");
   restaurant=rs.data();$("restaurantName").textContent=restaurant.name;
   const themeColor=typeof restaurant.themeColor==="string" && /^#[0-9a-f]{6}$/i.test(restaurant.themeColor) ? restaurant.themeColor : DEFAULT_THEME_COLOR;
-  document.documentElement?.style?.setProperty?.("--accent-color",themeColor);
+  applyMenuTheme(themeColor);
   $("tableInfo").textContent="მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
   unsubscribers.push(onSnapshot(collection(db,"restaurants",slug,"categories"),snapshot=>{
     categories.clear();snapshot.forEach(d=>categories.set(d.id,d.data()));renderTabs();render();
@@ -102,3 +110,4 @@ async function send(){
 }
 window.addEventListener("pagehide",()=>unsubscribers.forEach(stop=>stop()));
 init().catch(error=>{ready=false;drawCart();say(error.message);$("restaurantName").textContent="მენიუ მიუწვდომელია";});
+
