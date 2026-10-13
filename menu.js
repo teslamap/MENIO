@@ -31,22 +31,34 @@ function render(){
   $("menu").replaceChildren();
   const visible=dishes.filter(dish=>selectedCategory==="all" || groupId(dish)===selectedCategory);
   if(!visible.length){$("menu").textContent="მენიუ ჯერ არ არის დამატებული";return;}
+  const groups=new Map();
   for(const dish of visible){
-    const card=el("article",undefined,"dish-card");
-    const photo = safeProductImage(dish.imageUrl);
-    if(photo){
-      const image=el("img",undefined,"dish-photo");image.src=photo;image.alt=dish.name;image.loading="lazy";
-      image.onerror=()=>image.hidden=true;card.append(image);
+    const id=groupId(dish);
+    if(!groups.has(id))groups.set(id,{name:groupName(dish),dishes:[]});
+    groups.get(id).dishes.push(dish);
+  }
+  for(const group of [...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,"ka"))){
+    const section=el("section",undefined,"menu-category");
+    section.append(el("h2",group.name,"menu-category-title"));
+    const grid=el("div",undefined,"grid menu-category-grid");
+    for(const dish of group.dishes.sort((a,b)=>a.name.localeCompare(b.name,"ka"))){
+      const card=el("article",undefined,"dish-card");
+      const photo = safeProductImage(dish.imageUrl);
+      if(photo){
+        const image=el("img",undefined,"dish-photo");image.src=photo;image.alt=dish.name;image.loading="lazy";
+        image.onerror=()=>image.hidden=true;card.append(image);
+      }
+      card.append(el("h3",dish.name),el("p",dish.description || ""));
+      const row=el("div",undefined,"row"),button=el("button","დამატება +");
+      button.disabled=sending;
+      button.onclick=()=>{
+        const old=cart.get(dish.id);
+        cart.set(dish.id,{dishId:dish.id,name:dish.name,price:Number(dish.price),quantity:(old?.quantity || 0)+1});
+        drawCart();
+      };
+      row.append(el("b",money(dish.price)),button);card.append(row);grid.append(card);
     }
-    card.append(el("span",groupName(dish),"muted"),el("h3",dish.name),el("p",dish.description || ""));
-    const row=el("div",undefined,"row"),button=el("button","დამატება +");
-    button.disabled=sending;
-    button.onclick=()=>{
-      const old=cart.get(dish.id);
-      cart.set(dish.id,{dishId:dish.id,name:dish.name,price:Number(dish.price),quantity:(old?.quantity || 0)+1});
-      drawCart();
-    };
-    row.append(el("b",money(dish.price)),button);card.append(row);$("menu").append(card);
+    section.append(grid);$("menu").append(section);
   }
 }
 function drawCart(){
