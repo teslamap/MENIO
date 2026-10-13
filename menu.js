@@ -8,7 +8,6 @@ function applyMenuTheme(color){
   const hex=color.slice(1), red=parseInt(hex.slice(0,2),16), green=parseInt(hex.slice(2,4),16), blue=parseInt(hex.slice(4,6),16);
   const linear=value=>{value/=255;return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4;};
   const luminance=.2126*linear(red)+.7152*linear(green)+.0722*linear(blue);
-  document.documentElement?.style?.setProperty?.("--accent-color",color);
   document.documentElement?.style?.setProperty?.("--menu-background-color",color);
   document.documentElement?.style?.setProperty?.("--menu-foreground-color",luminance>.42?"#171920":"#f5f5f7");
 }
