@@ -5,7 +5,7 @@ import vm from "node:vm";
 import path from "node:path";
 const root=path.resolve(import.meta.dirname,"..");
 class Element {
-  constructor(){Object.assign(this,{value:"",checked:false,hidden:false,disabled:false,children:[],dataset:{},files:[],listeners:{}});}
+  constructor(){Object.assign(this,{value:"",checked:false,hidden:false,disabled:false,open:false,children:[],dataset:{},files:[],listeners:{}});}
   append(...nodes){this.children.push(...nodes);}
   replaceChildren(...nodes){this.children=nodes;}
   add(node){this.children.push(node);}
@@ -14,6 +14,8 @@ class Element {
   addEventListener(event,fn){this.listeners[event]=fn;}
   reset(){}
   focus(){}
+  showModal(){this.open=true;}
+  close(){this.open=false;}
   scrollIntoView(){}
 }
 function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",isAnonymous:false}){
@@ -42,6 +44,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
       get:async ref=>snap(ref.path),set:(ref,data)=>pending.push([ref.path,data,false]),
       update:(ref,data)=>pending.push([ref.path,data,true])
     });pending.forEach(([key,data,merge])=>database.set(key,merge?{...database.get(key),...data}:data));},
+    writeBatch:()=>{const writes=[];return {set:(ref,data)=>writes.push([ref.path,data]),commit:async()=>writes.forEach(([key,data])=>database.set(key,data))};},
     signOut:async()=>{},
     signInWithEmailAndPassword:async(auth,email)=>{signIns++;auth.currentUser={uid:"owner",email,isAnonymous:false};return {user:auth.currentUser};},
     createUserWithEmailAndPassword:async(auth,email)=>{created++;if(duplicateEmail){const error=Error("email already in use");error.code="auth/email-already-in-use";throw error;}auth.currentUser={uid:"owner",email,isAnonymous:false};return {user:auth.currentUser};},
@@ -59,6 +62,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
         .map(([key,data])=>({id:key.split("/").at(-1),data:()=>data}));
       l.fn({docs,empty:!docs.length,forEach:fn=>docs.forEach(fn)});
     }),
+    parseMenuImport:api.parseMenuImport,
     submit:async(id,auth=false)=>{const fn=auth?nodes.get(id).listeners.submit:nodes.get(id).onsubmit;
       await fn({preventDefault(){},submitter:new Element()});}
   };
@@ -97,6 +101,45 @@ test("deleted table numbers are never reused and order history survives",async()
   h.publish("restaurants/test/tables");await h.submit("tableForm");
   assert.equal(h.database.get("restaurants/test/tables/2").active,true);
   assert.equal(h.database.get("restaurants/test").nextTableNumber,3);
+});
+test("tables sidebar opens and closes the QR list dialog",async()=>{
+  const h=setup("dashboard.js","dashboard.html");await h.settle();
+  let prevented=false;
+  h.nodes.get("tablesNavLink").onclick({preventDefault(){prevented=true;}});
+  assert.equal(prevented,true);assert.equal(h.nodes.get("tableDialog").open,true);
+  h.nodes.get("closeTableDialog").onclick();assert.equal(h.nodes.get("tableDialog").open,false);
+});
+test("appearance sidebar opens and closes the restaurant theme dialog",async()=>{
+  const h=setup("dashboard.js","dashboard.html");await h.settle();
+  let prevented=false;
+  h.nodes.get("appearanceNavLink").onclick({preventDefault(){prevented=true;}});
+  assert.equal(prevented,true);assert.equal(h.nodes.get("appearanceDialog").open,true);
+  h.nodes.get("closeAppearanceDialog").onclick();assert.equal(h.nodes.get("appearanceDialog").open,false);
+});
+test("menu text import extracts categories, prices, and optional descriptions",async()=>{
+  const h=setup("dashboard.js","dashboard.html");
+  const source=["Welcome to დელიკატე","მენიუ","ბურგერი","ქათმის ხორცი","გამაგრილებელი სასმელი","ბურგერი",
+    "კლასიკური ბურგერი","საქონლის ხორცი, სოუსი","27 GEL","დამატება","გამაგრილებელი სასმელი",
+    "წყალი","2 GEL","დამატება"].join("\n");
+  assert.deepEqual(JSON.parse(JSON.stringify(h.parseMenuImport(source))),[
+    {name:"კლასიკური ბურგერი",description:"საქონლის ხორცი, სოუსი",price:27,category:"ბურგერი"},
+    {name:"წყალი",description:"",price:2,category:"გამაგრილებელი სასმელი"}
+  ]);
+});
+test("menu text import adds products without photos and avoids duplicate dishes",async()=>{
+  const h=setup("dashboard.js","dashboard.html",{"restaurants/test":{tableCount:1}});await h.settle();
+  h.publish("restaurants/test/categories");h.publish("restaurants/test/menu");
+  const source=["ბურგერი","წყალი","2 GEL","დამატება","გამაგრილებელი სასმელი","ლიმონათი","5 GEL","დამატება"].join("\n");
+  await h.nodes.get("menuImportFile").onchange({target:{files:[{text:async()=>source}]}});
+  await h.nodes.get("importMenuSubmit").onclick();
+  let added=[...h.database].filter(([key])=>key.includes("/menu/"));
+  assert.equal(added.length,2);assert.ok(added.every(([,data])=>data.imageUrl===""&&data.imagePath===""));
+  h.publish("restaurants/test/categories");h.publish("restaurants/test/menu");
+  await h.nodes.get("menuImportFile").onchange({target:{files:[{text:async()=>source}]}});
+  await h.nodes.get("importMenuSubmit").onclick();
+  added=[...h.database].filter(([key])=>key.includes("/menu/"));
+  assert.equal(added.length,2);
+  assert.match(h.nodes.get("businessMessage").textContent,/გამოტოვებულია 2 არსებული კერძი/);
 });
 test("anonymous users are redirected away from management",async()=>{
   const h=setup("dashboard.js","dashboard.html",{}, {uid:"guest",isAnonymous:true});
@@ -169,4 +212,5 @@ test("guest menu displays Firestore photo data without Firebase Storage",async()
   },null);await h.settle();h.publish("restaurants/test/menu");
   assert.equal(h.nodes.get("menu").children[0].children[0].src,photo);
 });
+
 
