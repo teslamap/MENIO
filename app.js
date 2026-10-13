@@ -11,7 +11,7 @@ const friendlyError=error=>({
   "auth/invalid-credential":"ელფოსტა ან პაროლი არასწორია.",
   "auth/weak-password":"პაროლი უნდა შეიცავდეს მინიმუმ 8 სიმბოლოს.",
   "auth/too-many-requests":"ძალიან ბევრი მცდელობაა. სცადე მოგვიანებით.",
-  "permission-denied":"წვდომა უარყოფილია. შეამოწმე Firebase-ის წვდომის წესები.",
+  "permission-denied":"Firestore-ის წესები საიტს არ ემთხვევა. Firebase Console-ში Firestore Database → Rules გახსენი და რეპოზიტორიაში არსებული firestore.rules გამოაქვეყნე, შემდეგ თავიდან შედი.",
   "unavailable":"კავშირი დროებით მიუწვდომელია. სცადე ხელახლა."
 })[error.code] || error.message;
 let authReady=Promise.resolve();
@@ -43,7 +43,16 @@ if($("registerForm")) {
         auth.currentUser.email?.toLowerCase()===email.toLowerCase()) {
         // Re-authenticate before resuming an incomplete restaurant registration.
         user=(await signInWithEmailAndPassword(auth,email,password)).user;
-      } else user=(await createUserWithEmailAndPassword(auth,email,password)).user;
+      } else {
+        try {
+          user=(await createUserWithEmailAndPassword(auth,email,password)).user;
+        } catch(error) {
+          if(error.code!=="auth/email-already-in-use") throw error;
+          // If an earlier attempt created this account but not its restaurant,
+          // sign into it with the submitted password and resume setup.
+          user=(await signInWithEmailAndPassword(auth,email,password)).user;
+        }
+      }
       await runTransaction(db,async tx=>{
         const existing=await tx.get(restaurantRef);
         if(existing.exists()) throw Error("ეს მისამართი დაკავებულია. აირჩიე სხვა ბმული.");

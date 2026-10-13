@@ -19,7 +19,7 @@ class Element {
 function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",isAnonymous:false}){
   const nodes=new Map([...fs.readFileSync(path.join(root,html),"utf8").matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
   if(nodes.has("productFilter"))nodes.get("productFilter").value="all";
-  const database=new Map(Object.entries(records)),listeners=[];let sequence=0,created=0,signIns=0;
+  const database=new Map(Object.entries(records)),listeners=[];let sequence=0,created=0,signIns=0,duplicateEmail=false,getDocsError=null;
   const snap=key=>({exists:()=>database.has(key),data:()=>database.get(key)});
   const auth={currentUser:user},location={search:"?restaurant=test&table=1",href:"https://menio.example/dashboard.html",replace(url){this.href=url;}};
   const api={
@@ -29,7 +29,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
     navigator:{clipboard:{writeText:async()=>{}}},confirm:()=>true,prompt:()=>{},
     collection:(db,...parts)=>({path:parts.join("/")}),
     doc:(base,...parts)=>{const key=base?.path?base.path+"/"+(parts[0]||"generated-"+(++sequence)):parts.join("/");return {path:key,id:key.split("/").at(-1)};},
-    getDoc:async ref=>snap(ref.path),getDocs:async()=>({empty:true,docs:[]}),
+    getDoc:async ref=>snap(ref.path),getDocs:async()=>{if(getDocsError)throw getDocsError;return {empty:true,docs:[]};},
     where:()=>({}),query:ref=>ref,orderBy:()=>({}),
     onAuthStateChanged:(auth,fn)=>{queueMicrotask(()=>fn(auth.currentUser));return ()=>{};},
     onSnapshot:(ref,fn)=>{listeners.push({ref,fn});return ()=>{};},
@@ -44,7 +44,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
     });pending.forEach(([key,data,merge])=>database.set(key,merge?{...database.get(key),...data}:data));},
     signOut:async()=>{},
     signInWithEmailAndPassword:async(auth,email)=>{signIns++;auth.currentUser={uid:"owner",email,isAnonymous:false};return {user:auth.currentUser};},
-    createUserWithEmailAndPassword:async(auth,email)=>{created++;auth.currentUser={uid:"owner",email,isAnonymous:false};return {user:auth.currentUser};},
+    createUserWithEmailAndPassword:async(auth,email)=>{created++;if(duplicateEmail){const error=Error("email already in use");error.code="auth/email-already-in-use";throw error;}auth.currentUser={uid:"owner",email,isAnonymous:false};return {user:auth.currentUser};},
     signInAnonymously:async auth=>{auth.currentUser={uid:"guest",isAnonymous:true};},
     addDoc:async()=>{}, safeImage:value=>value || "",safeProductImage:value=>value || "",encodeProductPhoto:async()=>"data:image/jpeg;base64,/9j/2Q=="
   };
@@ -52,7 +52,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
   vm.runInContext(fs.readFileSync(path.join(root,js),"utf8")
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*["'][^"']+["'];?/g,"")
     .replace(/export\s*\{[^}]*\};?/g,"").replace(/export\s+(?=async function|function)/g,""),api,{filename:js});
-  return {nodes,database,location,counts:()=>({created,signIns}),
+  return {nodes,database,location,counts:()=>({created,signIns}),setDuplicateEmail:value=>{duplicateEmail=value;},setGetDocsError:error=>{getDocsError=error;},
     settle:()=>new Promise(resolve=>setImmediate(resolve)),
     publish:prefix=>listeners.filter(l=>l.ref.path===prefix).forEach(l=>{
       const docs=[...database].filter(([key])=>key.startsWith(prefix+"/")&&!key.slice(prefix.length+1).includes("/"))
@@ -116,6 +116,22 @@ test("existing account resumes incomplete restaurant signup",async()=>{
   assert.equal(h.database.get("restaurants/test").nextTableNumber,3);
   assert.equal(h.database.get("restaurants/test/tables/2").active,true);
   assert.equal(h.location.href,"dashboard.html?restaurant=test");
+});
+test("existing email with the correct password signs in and finishes restaurant signup",async()=>{
+  const h=setup("app.js","register.html",{},null);await h.settle();fields(h);h.setDuplicateEmail(true);
+  await h.submit("registerForm",true);
+  assert.equal(h.counts().created,1);assert.equal(h.counts().signIns,1);
+  assert.equal(h.database.get("restaurants/test").slug,"test");
+  assert.equal(h.location.href,"dashboard.html?restaurant=test");
+  assert.equal(h.nodes.get("message").textContent,undefined);
+});
+test("login explains how to resolve obsolete Firestore read rules",async()=>{
+  const h=setup("app.js","register.html",{},null);await h.settle();
+  h.nodes.get("loginEmail").value="owner@example.com";h.nodes.get("loginPassword").value="password123";
+  h.setGetDocsError(Object.assign(Error("Missing or insufficient permissions."),{code:"permission-denied"}));
+  await h.submit("loginForm",true);
+  assert.match(h.nodes.get("message").textContent,/Firestore Database → Rules/);
+  assert.match(h.nodes.get("message").textContent,/firestore.rules/);
 });
 test("guest cart updates changed prices and removes unavailable products",async()=>{
   const h=setup("menu.js","menu.html",{
