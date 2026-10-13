@@ -14,9 +14,14 @@ const DEFAULT_THEME_COLOR = "#f97316";
 const say = message => { $("businessMessage").textContent = message; };
 function renderTheme(color = DEFAULT_THEME_COLOR) {
   const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_THEME_COLOR;
+  const hex=safeColor.slice(1), channels=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16));
+  const linear=value=>{value/=255;return value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4;};
+  const luminance=.2126*linear(channels[0])+.7152*linear(channels[1])+.0722*linear(channels[2]);
   $("themeColor").value = safeColor;
   $("themeColorValue").textContent = safeColor.toUpperCase();
   $("themePreview").style?.setProperty?.("--accent-color", safeColor);
+  $("themePreview").style?.setProperty?.("--menu-background-color", safeColor);
+  $("themePreview").style?.setProperty?.("--menu-foreground-color", luminance>.42?"#171920":"#f5f5f7");
 }
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
@@ -300,3 +305,4 @@ window.addEventListener("pagehide",() => {
   stopped=true; unsubscribers.forEach(unsubscribe => unsubscribe());
   if(imageObjectURL) URL.revokeObjectURL(imageObjectURL);
 });
+
