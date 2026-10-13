@@ -14,7 +14,7 @@ for page in root.glob("*.html"):
 for module in root.glob("*.js"):
     source = module.read_text(encoding="utf-8")
     for imported, reference in re.findall(r'import\s*\{([^}]+)\}\s*from\s*["\x27](\./[^"\x27]+)', source, re.S):
-        target = root / reference
+        target = root / reference.split("?", 1)[0].split("#", 1)[0]
         if not target.is_file():
             errors.append(f"{module.name}: missing module {reference}")
             continue
@@ -29,3 +29,4 @@ for module in root.glob("*.js"):
 if errors:
     raise SystemExit("\n".join(errors))
 print("Local HTML assets and JavaScript module exports are valid.")
+

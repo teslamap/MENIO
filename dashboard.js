@@ -3,7 +3,7 @@ import {
   onSnapshot, runTransaction, serverTimestamp, onAuthStateChanged, signOut
 } from "./firebase.js";
 import { requireOwner } from "./app.js";
-import { safeProductImage as safeImage, encodeProductPhoto } from "./image-utils.js";
+import { safeProductImage as safeImage, encodeProductPhoto } from "./image-utils.js?v=20261013-photo-upload-1";
 
 const $ = id => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get("restaurant");
@@ -81,23 +81,21 @@ $("saveBulkPhotos").onclick = async () => {
   $("bulkPhotoFiles").disabled = true;
   let saved = 0;
   try {
-    setPhotoProgress("bulk", 0, "ფოტოებს ვამზადებ…");
-    const prepared = [];
-    for (const pair of photoPairs) {
+    const total = photoPairs.length;
+    for (const [index, pair] of photoPairs.entries()) {
       if (!products.has(pair.id) || products.get(pair.id).name !== pair.name) throw Error("პროდუქტები შეიცვალა. ფოტოები თავიდან აირჩიე.");
-      prepared.push({ ...pair, imageUrl:await encodeProductPhoto(pair.file) });
-      setPhotoProgress("bulk", prepared.length / photoPairs.length * 45, `ფოტოების დამუშავება ${prepared.length} / ${photoPairs.length}`);
-    }
-    for (const pair of prepared) {
       if (stopped) throw Error("სესია დასრულდა.");
-      await updateDoc(doc(menuRef,pair.id), { imageUrl:pair.imageUrl, imagePath:"", updatedAt:serverTimestamp() });
+      setPhotoProgress("bulk", saved / total * 100, `ვამზადებ ფოტოს ${index + 1} / ${total} · ${pair.name}`);
+      const imageUrl = await encodeProductPhoto(pair.file);
+      await updateDoc(doc(menuRef,pair.id), { imageUrl, imagePath:"", updatedAt:serverTimestamp() });
       saved++;
-      setPhotoProgress("bulk", 45 + saved / prepared.length * 55, `ატვირთულია ${saved} / ${prepared.length} ფოტო`, saved === prepared.length ? "complete" : "working");
-      say(`ინახება ფოტოები: ${saved} / ${prepared.length}`);
+      setPhotoProgress("bulk", saved / total * 100, `შენახულია ${saved} / ${total} · შემდეგი: ${photoPairs[index + 1]?.name || "დასრულება"}`, saved === total ? "complete" : "working");
+      say(`ინახება ფოტოები: ${saved} / ${total}`);
     }
     photoPairs = [];
     $("bulkPhotoFiles").value = "";
     $("bulkPhotoPreview").replaceChildren();
+    setPhotoProgress("bulk", 100, `შენახულია ${saved} / ${saved} ფოტო`, "complete");
     say(`შენახულია ${saved} ფოტო უკუმიმართულებით.`);
   } catch (error) {
     const progress = $("bulkPhotoProgress");

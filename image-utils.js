@@ -6,6 +6,18 @@ export function safeProductImage(value) {
   try { const url = new URL(value); return url.protocol === "https:" ? url.href : ""; }
   catch { return ""; }
 }
+function canvasJpegData(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob) { reject(Error("ფოტოს შეკუმშვა ვერ მოხერხდა.")); return; }
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(Error("ფოტოს წაკითხვა ვერ მოხერხდა."));
+      reader.onerror = () => reject(Error("ფოტოს წაკითხვა ვერ მოხერხდა."));
+      reader.onabort = () => reject(Error("ფოტოს წაკითხვა შეწყდა."));
+      reader.readAsDataURL(blob);
+    }, "image/jpeg", quality);
+  });
+}
 export async function encodeProductPhoto(file) {
   if (!["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 5*1024*1024) {
     throw Error("აირჩიე JPEG, PNG ან WebP ფოტო, მაქსიმუმ 5 MB.");
@@ -24,10 +36,11 @@ export async function encodeProductPhoto(file) {
       context.fillRect(0,0,canvas.width,canvas.height);
       context.drawImage(bitmap,0,0,canvas.width,canvas.height);
       for (const quality of [.82,.65,.5,.35]) {
-        const data = canvas.toDataURL("image/jpeg",quality);
+        const data = await canvasJpegData(canvas,quality);
         if (safeProductImage(data) && data.startsWith("data:image/jpeg;base64,")) return data;
       }
     }
     throw Error("ფოტო ძალიან დეტალურია. აირჩიე უფრო მარტივი ან მცირე ფოტო.");
   } finally { bitmap.close(); }
 }
+

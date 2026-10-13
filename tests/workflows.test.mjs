@@ -21,7 +21,7 @@ class Element {
 function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",isAnonymous:false}){
   const nodes=new Map([...fs.readFileSync(path.join(root,html),"utf8").matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Element()]));
   if(nodes.has("productFilter"))nodes.get("productFilter").value="all";
-  const database=new Map(Object.entries(records)),listeners=[];let sequence=0,created=0,signIns=0,duplicateEmail=false,getDocsError=null;
+  const database=new Map(Object.entries(records)),listeners=[],updates=[];let sequence=0,created=0,signIns=0,duplicateEmail=false,getDocsError=null;
   const snap=key=>({exists:()=>database.has(key),data:()=>database.get(key)});
   const auth={currentUser:user},location={search:"?restaurant=test&table=1",href:"https://menio.example/dashboard.html",replace(url){this.href=url;}};
   const api={
@@ -38,7 +38,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
     requireOwner:async()=>({name:"Test",tableCount:1}),
     serverTimestamp:()=>"timestamp",
     setDoc:async(ref,data)=>database.set(ref.path,data),
-    updateDoc:async(ref,data)=>{assert.ok(database.has(ref.path));database.set(ref.path,{...database.get(ref.path),...data});},
+    updateDoc:async(ref,data)=>{assert.ok(database.has(ref.path));updates.push({path:ref.path,progressLabel:nodes.get("bulkPhotoProgressLabel")?.textContent});database.set(ref.path,{...database.get(ref.path),...data});},
     deleteDoc:async ref=>database.delete(ref.path),
     runTransaction:async(db,fn)=>{const pending=[];await fn({
       get:async ref=>snap(ref.path),set:(ref,data)=>pending.push([ref.path,data,false]),
@@ -55,7 +55,7 @@ function setup(js,html,records={},user={uid:"owner",email:"owner@example.com",is
   vm.runInContext(fs.readFileSync(path.join(root,js),"utf8")
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*["'][^"']+["'];?/g,"")
     .replace(/export\s*\{[^}]*\};?/g,"").replace(/export\s+(?=async function|function)/g,""),api,{filename:js});
-  return {nodes,database,location,counts:()=>({created,signIns}),setDuplicateEmail:value=>{duplicateEmail=value;},setGetDocsError:error=>{getDocsError=error;},
+  return {nodes,database,location,updates,counts:()=>({created,signIns}),setDuplicateEmail:value=>{duplicateEmail=value;},setGetDocsError:error=>{getDocsError=error;},
     settle:()=>new Promise(resolve=>setImmediate(resolve)),
     publish:prefix=>listeners.filter(l=>l.ref.path===prefix).forEach(l=>{
       const docs=[...database].filter(([key])=>key.startsWith(prefix+"/")&&!key.slice(prefix.length+1).includes("/"))
@@ -255,8 +255,17 @@ test("bulk photo upload advances through preparation and save",async()=>{
   await h.nodes.get("saveBulkPhotos").onclick();
   assert.equal(h.nodes.get("bulkPhotoProgressWrap").hidden,false);
   assert.equal(h.nodes.get("bulkPhotoProgress").value,100);
-  assert.equal(h.nodes.get("bulkPhotoProgressLabel").textContent,"ატვირთულია 2 / 2 ფოტო");
+  assert.equal(h.nodes.get("bulkPhotoProgressLabel").textContent,"შენახულია 2 / 2 ფოტო");
+  assert.match(h.updates[0].progressLabel,/ვამზადებ ფოტოს 1 \/ 2/);
+  assert.match(h.updates[1].progressLabel,/ვამზადებ ფოტოს 2 \/ 2/);
   assert.ok(["a","b"].every(id=>/^data:image\/jpeg/.test(h.database.get(`restaurants/test/menu/${id}`).imageUrl)));
+});
+
+test("bulk photo save explains why it cannot start without a prepared folder",async()=>{
+  const h=setup("dashboard.js","dashboard.html",{"restaurants/test":{tableCount:1}});await h.settle();
+  await h.nodes.get("saveBulkPhotos").onclick();
+  assert.equal(h.nodes.get("businessMessage").textContent,
+    "ფოტოები დასამუშავებლად მზად არ არის. ხელახლა აირჩიე საქაღალდე და გადაამოწმე რაოდენობა.");
 });
 
 test("guest menu shows a fallback when a saved product photo cannot load",async()=>{

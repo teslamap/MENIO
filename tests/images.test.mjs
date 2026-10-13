@@ -7,10 +7,11 @@ const JPEG="data:image/jpeg;base64,/9j/2Q==";
 function setup(encode=()=>JPEG){
   let closed=0,decoded=0,attempts=[];
   const canvas={width:0,height:0,getContext:()=>({fillRect(){},drawImage(){}}),
-    toDataURL:(type,quality)=>{attempts.push({width:canvas.width,height:canvas.height,quality});return encode(canvas,quality);}};
+    toBlob:(callback,type,quality)=>{attempts.push({width:canvas.width,height:canvas.height,quality});setTimeout(()=>callback({data:encode(canvas,quality)}),0);}};
+  class MockFileReader{readAsDataURL(blob){this.result=blob.data;this.onload?.();}}
   const ctx={URL,document:{createElement:()=>canvas},createImageBitmap:async()=>{
     decoded++;return {width:2400,height:1600,close(){closed++;}};
-  }};
+  },FileReader:MockFileReader};
   vm.createContext(ctx);vm.runInContext(code,ctx);
   return {ctx,stats:()=>({closed,decoded,attempts})};
 }
@@ -45,3 +46,4 @@ test("uncompressible photos fail without saving and still release the bitmap",as
   await assert.rejects(h.ctx.encodeProductPhoto({type:"image/jpeg",size:1024}));
   assert.equal(h.stats().attempts.length,24);assert.equal(h.stats().closed,1);
 });
+
