@@ -182,7 +182,7 @@ test("guest cart updates changed prices and removes unavailable products",async(
     "restaurants/test/menu/water":{name:"წყალი",price:2,active:true,categoryId:"drinks"},
     "restaurants/test/categories/drinks":{name:"სასმელი"}
   },null);await h.settle();h.publish("restaurants/test/categories");h.publish("restaurants/test/menu");
-  h.nodes.get("menu").children[0].children.at(-1).children[1].onclick();
+  h.nodes.get("menu").children[0].children[1].children[0].children.at(-1).children[1].onclick();
   assert.equal(h.nodes.get("total").textContent,"2.00 ₾");
   h.database.get("restaurants/test/menu/water").price=3;h.publish("restaurants/test/menu");
   assert.equal(h.nodes.get("total").textContent,"3.00 ₾");
@@ -210,7 +210,24 @@ test("guest menu displays Firestore photo data without Firebase Storage",async()
     "restaurants/test":{name:"Test",active:true},"restaurants/test/tables/1":{number:1,active:true},
     "restaurants/test/menu/photo":{name:"Photo dish",price:12,active:true,imageUrl:photo}
   },null);await h.settle();h.publish("restaurants/test/menu");
-  assert.equal(h.nodes.get("menu").children[0].children[0].src,photo);
+  assert.equal(h.nodes.get("menu").children[0].children[1].children[0].children[0].src,photo);
+});
+
+test("guest menu groups dishes under sorted category headings",async()=>{
+  const h=setup("menu.js","menu.html",{
+    "restaurants/test":{name:"Test",active:true},"restaurants/test/tables/1":{number:1,active:true},
+    "restaurants/test/menu/water":{name:"წყალი",price:2,active:true,categoryId:"drinks"},
+    "restaurants/test/menu/tea":{name:"ჩაი",price:4,active:true,categoryId:"drinks"},
+    "restaurants/test/menu/soup":{name:"წვნიანი",price:8,active:true,categoryId:"soups"},
+    "restaurants/test/categories/drinks":{name:"სასმელი"},
+    "restaurants/test/categories/soups":{name:"წვნიანი კერძები"}
+  },null);await h.settle();h.publish("restaurants/test/categories");h.publish("restaurants/test/menu");
+  const sections=h.nodes.get("menu").children;
+  assert.equal(sections.length,2);
+  assert.equal(sections[0].children[0].textContent,"სასმელი");
+  assert.equal(sections[0].children[1].children.length,2);
+  assert.equal(sections[1].children[0].textContent,"წვნიანი კერძები");
+  assert.equal(sections[1].children[1].children.length,1);
 });
 
 
