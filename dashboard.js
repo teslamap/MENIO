@@ -216,6 +216,8 @@ $("dishImage").onchange = () => {
 $("cancelEdit").onclick = resetProduct;
 $("cancelCategory").onclick = resetCategory;
 $("productFilter").onchange = renderProducts;
+$("tablesNavLink").onclick = event => { event.preventDefault(); $("tableDialog").showModal(); };
+$("closeTableDialog").onclick = () => $("tableDialog").close();
 $("themeColor").oninput = event => renderTheme(event.target.value);
 $("saveTheme").onclick = async () => {
   const button = $("saveTheme"); button.disabled = true;
