@@ -3,6 +3,35 @@ import { safeProductImage } from "./image-utils.js";
 const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table"));
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false;
+let detailId=null;
+function addDish(dish){
+  if(sending || !ready)return;
+  const old=cart.get(dish.id);
+  cart.set(dish.id,{dishId:dish.id,name:dish.name,price:Number(dish.price),quantity:(old?.quantity || 0)+1});
+  drawCart();
+}
+function openProduct(dish){
+  detailId=dish.id;
+  $("productName").textContent=dish.name;
+  $("productCategory").textContent=groupName(dish);
+  $("productDescription").textContent=dish.description || "ამ პროდუქტს დამატებითი აღწერა ჯერ არ აქვს.";
+  $("productPrice").textContent=money(dish.price);
+  const photo=safeProductImage(dish.imageUrl);
+  $("productPhoto").hidden=!photo;
+  $("productPhoto").src=photo || "";
+  $("productPhoto").alt=dish.name;
+  $("productPhoto").onerror=()=>$("productPhoto").hidden=true;
+  $("productAdd").disabled=sending || !ready;
+  $("productAdd").textContent="შეკვეთაში დამატება +";
+  if(!$("productDialog").open)$("productDialog").showModal();
+}
+$("productClose").onclick=()=>$("productDialog").close();
+$("productDialog").addEventListener("click",event=>{if(event.target===$("productDialog"))$("productDialog").close();});
+$("productDialog").addEventListener("close",()=>{detailId=null;});
+$("productAdd").onclick=()=>{
+  const dish=dishes.find(d=>d.id===detailId);
+  if(dish && !sending && ready){addDish(dish);$("productAdd").textContent="დამატებულია ✓ · კიდევ დამატება +";}
+};
 const DEFAULT_THEME_COLOR="#f97316";
 function applyMenuTheme(color){
   const hex=color.slice(1), red=parseInt(hex.slice(0,2),16), green=parseInt(hex.slice(2,4),16), blue=parseInt(hex.slice(4,6),16);
@@ -48,13 +77,15 @@ function render(){
         const image=el("img",undefined,"dish-photo");image.src=photo;image.alt=dish.name;image.loading="lazy";
         image.onerror=()=>image.hidden=true;card.append(image);
       }
-      card.append(el("h3",dish.name),el("p",dish.description || ""));
+      const title=el("h3"),details=el("button",dish.name,"dish-details");
+      details.setAttribute("aria-haspopup","dialog");details.setAttribute("aria-label",dish.name+" — დეტალურად ნახვა");
+      details.onclick=()=>openProduct(dish);title.append(details);
+      card.onclick=event=>{if(!event.target.closest?.("button"))openProduct(dish);};
+      card.append(title,el("p",dish.description || "აღწერის სანახავად გახსენი პროდუქტი"));
       const row=el("div",undefined,"row"),button=el("button","დამატება +");
       button.disabled=sending;
       button.onclick=()=>{
-        const old=cart.get(dish.id);
-        cart.set(dish.id,{dishId:dish.id,name:dish.name,price:Number(dish.price),quantity:(old?.quantity || 0)+1});
-        drawCart();
+        addDish(dish);
       };
       row.append(el("b",money(dish.price)),button);card.append(row);grid.append(card);
     }
@@ -75,6 +106,10 @@ function drawCart(){
   $("total").textContent=money(total);$("cartItemCount").textContent=count;$("cartSummaryTotal").textContent=money(total);$("sendOrder").disabled=!ready || sending || !cart.size;
 }
 function reconcileCart(){
+  if(detailId){
+    const current=dishes.find(d=>d.id===detailId);
+    if(current)openProduct(current);else $("productDialog").close();
+  }
   let changed=false;
   for(const [id,item] of cart){
     const dish=dishes.find(d=>d.id===id);
