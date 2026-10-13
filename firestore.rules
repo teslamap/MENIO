@@ -28,7 +28,9 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid;
       allow update: if ownsExisting(slug)
         && request.resource.data.slug == resource.data.slug
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tableCount', 'nextTableNumber', 'active'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tableCount', 'nextTableNumber', 'active', 'themeColor'])
+        && (!('themeColor' in request.resource.data) || (request.resource.data.themeColor is string
+          && request.resource.data.themeColor.matches('^#[0-9a-fA-F]{6}$')))
         && request.resource.data.tableCount is int
         && request.resource.data.tableCount >= 0
         && request.resource.data.tableCount <= 200

@@ -10,7 +10,14 @@ const slug = new URLSearchParams(location.search).get("restaurant");
 const products = new Map(), categories = new Map(), tables = new Map();
 const unsubscribers = [];
 let imageObjectURL, stopped = false;
+const DEFAULT_THEME_COLOR = "#f97316";
 const say = message => { $("businessMessage").textContent = message; };
+function renderTheme(color = DEFAULT_THEME_COLOR) {
+  const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_THEME_COLOR;
+  $("themeColor").value = safeColor;
+  $("themeColorValue").textContent = safeColor.toUpperCase();
+  $("themePreview").style.setProperty("--accent-color", safeColor);
+}
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -204,6 +211,17 @@ $("dishImage").onchange = () => {
 $("cancelEdit").onclick = resetProduct;
 $("cancelCategory").onclick = resetCategory;
 $("productFilter").onchange = renderProducts;
+$("themeColor").oninput = event => renderTheme(event.target.value);
+$("saveTheme").onclick = async () => {
+  const button = $("saveTheme"); button.disabled = true;
+  try {
+    const color = $("themeColor").value;
+    if (!/^#[0-9a-f]{6}$/i.test(color)) throw Error("აირჩიე სწორი ფერი.");
+    await updateDoc(doc(db, "restaurants", slug), { themeColor: color });
+    renderTheme(color); say("მენიუს ფერი შენახულია.");
+  } catch(error) { say("ფერის შენახვა ვერ მოხერხდა: " + error.message); }
+  finally { button.disabled = false; }
+};
 $("dishForm").onsubmit = async event => {
   event.preventDefault(); const button=$("saveDish"); button.disabled=true;
   try {
@@ -270,6 +288,7 @@ onAuthStateChanged(auth,async user => {
     if (!slug) throw Error("რესტორანი არ არის არჩეული. შედი ანგარიშში ხელახლა.");
     const restaurant=await requireOwner(slug);
     $("restaurantInfo").textContent=restaurant.name;
+    renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);
     $("merchantLink").href="merchant.html?restaurant="+encodeURIComponent(slug);
     $("dashboardContent").hidden=false;
     listen(menuRef,products,() => { renderProducts(); renderCategories(); });

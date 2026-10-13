@@ -3,6 +3,7 @@ import { safeProductImage } from "./image-utils.js";
 const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table"));
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false;
+const DEFAULT_THEME_COLOR="#f97316";
 const money=n=>Number(n).toFixed(2)+" ₾";
 const say=text=>{ $("message").textContent=text; };
 const el=(tag,text,className)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;};
@@ -72,6 +73,8 @@ async function init(){
   const [rs,ts]=await Promise.all([getDoc(doc(db,"restaurants",slug)),getDoc(doc(db,"restaurants",slug,"tables",String(table)))]);
   if(!rs.exists() || !rs.data().active || !ts.exists() || !ts.data().active)throw Error("რესტორანი ან მაგიდა მიუწვდომელია");
   restaurant=rs.data();$("restaurantName").textContent=restaurant.name;
+  const themeColor=typeof restaurant.themeColor==="string" && /^#[0-9a-f]{6}$/i.test(restaurant.themeColor) ? restaurant.themeColor : DEFAULT_THEME_COLOR;
+  document.documentElement.style.setProperty("--accent-color",themeColor);
   $("tableInfo").textContent="მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
   unsubscribers.push(onSnapshot(collection(db,"restaurants",slug,"categories"),snapshot=>{
     categories.clear();snapshot.forEach(d=>categories.set(d.id,d.data()));renderTabs();render();
