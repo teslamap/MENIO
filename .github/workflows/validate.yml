@@ -30,35 +30,15 @@ jobs:
             echo "Checking $file"
             node --input-type=module --check < "$file"
           done
-      - name: Check local page assets and module references
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re, sys
-          root = Path(".")
-          errors = []
-          for html in root.glob("*.html"):
-              source = html.read_text(encoding="utf-8")
-              for attr, pattern in [
-                  ("src", r'<script[^>]+src=["\']([^"\']+)["\']'),
-                  ("href", r'<link[^>]+href=["\']([^"\']+)["\']'),
-              ]:
-                  for ref in re.findall(pattern, source, re.I):
-                      if ref.startswith(("http://", "https://", "#", "mailto:")):
-                          continue
-                      local = ref.split("?", 1)[0].split("#", 1)[0]
-                      if local and not (root / local).exists():
-                          errors.append(f"{html}: missing {attr}={ref}")
-          if errors:
-              print("\n".join(errors))
-              sys.exit(1)
-          print("All local HTML script and stylesheet references exist.")
-          PY
+      - name: Test restaurant and guest workflows
+        run: node --test tests/workflows.test.mjs
+      - name: Check local assets and JavaScript module exports
+        run: python tests/check-assets.py
       - name: Ensure Firebase config has no placeholders
         run: |
           ! grep -Eq 'YOUR_API_KEY|YOUR_PROJECT_ID|YOUR_PROJECT\.firebaseapp\.com' firebase.js
-      - name: Validate Firestore rules with the emulator
+      - name: Validate Firestore and Storage rules with the emulators
         run: |
           npm install --global firebase-tools
-          firebase emulators:exec --only firestore --project demo-menio --non-interactive "echo Firestore rules compiled successfully"
+          firebase emulators:exec --only firestore,storage --project demo-menio --non-interactive "echo Firestore and Storage rules compiled successfully"
+

@@ -14,23 +14,70 @@ service cloud.firestore {
     match /restaurants/{slug} {
       allow read: if true;
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['name', 'slug', 'tableCount', 'active', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'slug', 'tableCount', 'nextTableNumber', 'active', 'createdAt'])
         && request.resource.data.slug == slug
         && request.resource.data.active == true
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.tableCount is int
+        && request.resource.data.tableCount >= 1
+        && request.resource.data.tableCount <= 200
+        && request.resource.data.nextTableNumber == request.resource.data.tableCount + 1
         && existsAfter(/databases/$(database)/documents/restaurantOwners/$(slug))
         && getAfter(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid;
       allow update: if ownsExisting(slug)
         && request.resource.data.slug == resource.data.slug
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tableCount', 'active']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tableCount', 'nextTableNumber', 'active'])
+        && request.resource.data.tableCount is int
+        && request.resource.data.tableCount >= 0
+        && request.resource.data.tableCount <= 200
+        && (!('nextTableNumber' in resource.data) || request.resource.data.nextTableNumber >= resource.data.nextTableNumber);
       allow delete: if false;
 
       match /tables/{tableId} {
         allow read: if true;
-        allow write: if owns(slug);
+        allow create, update: if owns(slug)
+          && request.resource.data.keys().hasOnly(['number', 'active', 'label'])
+          && request.resource.data.number is int
+          && request.resource.data.number >= 1
+          && tableId == string(request.resource.data.number)
+          && request.resource.data.active is bool
+          && request.resource.data.label is string
+          && request.resource.data.label.size() <= 80
+          && (resource == null || (request.resource.data.number == resource.data.number
+            && (resource.data.active == true || request.resource.data.active == false)));
+        allow delete: if false;
+      }
+      match /categories/{categoryId} {
+        allow read: if true;
+        allow create, update: if owns(slug)
+          && request.resource.data.keys().hasOnly(['name', 'createdAt', 'updatedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 80
+          && request.resource.data.createdAt is timestamp;
+        allow delete: if owns(slug);
       }
       match /menu/{dishId} {
         allow read: if true;
-        allow write: if owns(slug);
+        allow create, update: if owns(slug)
+          && request.resource.data.keys().hasOnly(['name', 'description', 'price', 'categoryId', 'category', 'active', 'imageUrl', 'imagePath', 'createdAt', 'updatedAt', 'demo'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 120
+          && request.resource.data.description is string
+          && request.resource.data.description.size() <= 2000
+          && request.resource.data.price is number
+          && request.resource.data.price > 0
+          && request.resource.data.price <= 100000
+          && request.resource.data.active is bool
+          && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == ''
+            || exists(/databases/$(database)/documents/restaurants/$(slug)/categories/$(request.resource.data.categoryId)))
+          && (!('imageUrl' in request.resource.data) || (request.resource.data.imageUrl is string
+            && request.resource.data.imageUrl.size() <= 2048))
+          && (!('imagePath' in request.resource.data) || request.resource.data.imagePath is string);
+        allow delete: if owns(slug);
       }
     }
 

@@ -1,6 +1,6 @@
 import{initializeApp}from"https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously}from"https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
-import{getFirestore,doc,getDoc,getDocs,setDoc,addDoc,collection,query,where,orderBy,onSnapshot,updateDoc,serverTimestamp,runTransaction}from"https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+import{getFirestore,deleteDoc,writeBatch,doc,getDoc,getDocs,setDoc,addDoc,collection,query,where,orderBy,onSnapshot,updateDoc,serverTimestamp,runTransaction}from"https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 const firebaseConfig={
   apiKey:"AIzaSyDghOTPxpYXBGijyZMJTL3SxTazB881YMo",
@@ -12,7 +12,11 @@ const firebaseConfig={
   measurementId:"G-GYH32VBGTV"
 };
 
+import {getStorage,ref,uploadBytes,getDownloadURL,deleteObject} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js";
 const app=initializeApp(firebaseConfig);
 export const auth=getAuth(app);
 export const db=getFirestore(app);
+export const storage=getStorage(app);
+export {deleteDoc,writeBatch,ref,uploadBytes,getDownloadURL,deleteObject};
 export{createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously,doc,getDoc,getDocs,setDoc,addDoc,collection,query,where,orderBy,onSnapshot,updateDoc,serverTimestamp,runTransaction};
+
