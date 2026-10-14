@@ -178,6 +178,8 @@ async function init(){
 }
 async function send(){
   if(sending || !ready || !cart.size)return;
+  const soundReady=await window.MENIOSound?.ensureEnabled?.();
+  if(soundReady!==true){say("შეკვეთა არ გაგზავნილა — შეკვეთის ხმის ჩართვა აუცილებელია.");return;}
   sending=true;render();drawCart();
   try{
     await authReady;
