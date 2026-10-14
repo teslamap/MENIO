@@ -8,6 +8,27 @@ const dateOf=value=>{if(!value)return null;if(typeof value.toDate==="function")r
 const make=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e};
 function addInsight(label,value){const row=make("div","insight"),left=make("span","",label),right=make("strong","",value);row.append(left,right);$("insights").append(row)}
 function getPeriodOrders(){const start=periods[period].start(),end=new Date();return allOrders.filter(o=>{const d=dateOf(o.createdAt);return d&&d>=start&&d<=end})}
+function renderOrdersPopup(){
+ const root=$("ordersDialogBody");root.replaceChildren();
+ const orders=getPeriodOrders().sort((a,b)=>(dateOf(b.createdAt)?.getTime()||0)-(dateOf(a.createdAt)?.getTime()||0));
+ if(!orders.length){root.append(make("div","orders-empty","არჩეულ პერიოდში შეკვეთები არ არის."));return}
+ let currentDate="";
+ for(const order of orders){
+  const date=dateOf(order.createdAt),dateKey=date?date.toLocaleDateString("ka-GE",{year:"numeric",month:"long",day:"numeric"}):"თარიღი უცნობია";
+  if(dateKey!==currentDate){
+   currentDate=dateKey;
+   const group=make("section","orders-date-group"),heading=make("h3","orders-date-heading",dateKey),list=make("div","orders-list");
+   group.append(heading,list);root.append(group);
+  }
+  const list=root.lastElementChild.querySelector(".orders-list");
+  const card=make("article","history-order"),head=make("div","history-order-head");
+  head.append(make("span","","მაგიდა №"+(order.tableNumber??"—")),make("span","",date?date.toLocaleTimeString("ka-GE",{hour:"2-digit",minute:"2-digit"}):""));
+  const items=make("p","history-order-items",(order.items||[]).map(item=>(item.name||"პროდუქტი")+" × "+(item.quantity??1)).join(" · ")||"პროდუქტის სია არ არის");
+  const foot=make("div","history-order-foot"),statusMap={new:"ახალი",accepted:"მიღებულია",preparing:"მზადდება",completed:"მზადაა",cancelled:"გაუქმებულია"};
+  foot.append(make("span","",((statusMap[order.status]||order.status||"სტატუსი უცნობია")+" · "+(order.paymentStatus==="paid"?"გადახდილია":"გადასახდელია"))),make("strong","",money(order.total)));
+  card.append(head,items,foot);list.append(card);
+ }
+}
 function render(){
  const filtered=getPeriodOrders(),valid=filtered.filter(o=>o.status!=="cancelled"),cancelled=filtered.filter(o=>o.status==="cancelled");
  const gross=valid.reduce((sum,o)=>sum+Number(o.total||0),0);
@@ -15,8 +36,9 @@ function render(){
  const due=valid.filter(o=>o.paymentStatus!=="paid").reduce((sum,o)=>sum+Number(o.total||0),0);
  const average=valid.length?gross/valid.length:0;
  $("paidRevenue").textContent=money(paid);$("grossSales").textContent=money(gross);$("outstanding").textContent=money(due);$("orderCount").textContent=String(valid.length);
- $("orderCountNote").textContent=cancelled.length+" გაუქმებული შეკვეთა";
+ $("orderCountNote").textContent=cancelled.length+" გაუქმებული შეკვეთა · სიის სანახავად დააჭირე";
  $("periodLabel").textContent="პერიოდი: "+periods[period].label+" · "+periods[period].start().toLocaleDateString("ka-GE")+" — "+new Date().toLocaleDateString("ka-GE");
+ if($("ordersDialog").open)renderOrdersPopup();
  const productMap=new Map();
  for(const o of valid)for(const item of (o.items||[])){const name=String(item.name||"უცნობი პროდუქტი"),qty=Number(item.quantity||1),amount=Number(item.price||0)*qty,prev=productMap.get(name)||{name,qty:0,revenue:0};prev.qty+=qty;prev.revenue+=amount;productMap.set(name,prev)}
  const top=[...productMap.values()].sort((a,b)=>b.qty-a.qty).slice(0,5);
@@ -42,6 +64,9 @@ function render(){
  }
 }
 document.querySelectorAll("[data-period]").forEach(button=>button.addEventListener("click",()=>{period=button.dataset.period;document.querySelectorAll("[data-period]").forEach(b=>b.setAttribute("aria-pressed",String(b===button)));render()}));
+$("openOrders").addEventListener("click",()=>{renderOrdersPopup();$("ordersDialog").showModal()});
+$("closeOrders").addEventListener("click",()=>$("ordersDialog").close());
+$("ordersDialog").addEventListener("click",event=>{if(event.target===$("ordersDialog"))$("ordersDialog").close()});
 $("exportCsv").addEventListener("click",()=>{
  const orders=getPeriodOrders().sort((a,b)=>(dateOf(a.createdAt)?.getTime()||0)-(dateOf(b.createdAt)?.getTime()||0));
  const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
