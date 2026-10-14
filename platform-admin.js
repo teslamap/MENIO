@@ -6,7 +6,10 @@ const say=text=>{$("adminMessage").textContent=text};
 function showLogin(message=""){$("loginPanel").hidden=false;$("adminPanel").hidden=true;if(message)say(message)}
 function card(restaurant){
  const article=document.createElement("article");article.className="restaurant-card";
- const icon=document.createElement("div");icon.className="restaurant-icon";icon.textContent=(restaurant.name||"R").trim().slice(0,1).toUpperCase();
+ const icon=document.createElement("div");icon.className="restaurant-icon";
+ if(typeof restaurant.restaurantLogo==="string" && restaurant.restaurantLogo){
+  const logo=document.createElement("img");logo.className="restaurant-logo-image";logo.src=restaurant.restaurantLogo;logo.alt=(restaurant.name||"რესტორნის ლოგო")+" — ლოგო";logo.loading="lazy";icon.append(logo);
+ }else{icon.textContent=(restaurant.name||"R").trim().slice(0,1).toUpperCase();}
  const name=document.createElement("h2");name.textContent=restaurant.name||restaurant.slug;
  const slug=document.createElement("div");slug.className="slug";slug.textContent="/"+restaurant.slug;
  const meta=document.createElement("div");meta.className="restaurant-meta";
