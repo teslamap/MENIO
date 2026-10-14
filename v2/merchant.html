@@ -1,2 +1,64 @@
-<!doctype html><html lang="ka"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MENIO Merchant</title><link rel="stylesheet" href="style.css?v=20261013-v2-4"></head><body><main class="container"><header class="topbar"><a class="logo" href="index.html">MENIO<span>.</span></a><div class="row"><span class="live-dot"></span>Live orders <button id="logout" class="secondary small-button">გასვლა</button></div><a id="backToDashboard" class="btn secondary small-button" href="register.html#login">მართვის პანელი</a></header><p class="eyebrow">RESTAURANT OPERATIONS</p><h1 style="font-size:42px">Merchant / შეკვეთები</h1><p id="status">შეკვეთებს ველოდები…</p><section id="orders" class="grid"></section></main><script type="module" src="merchant.js"></script><script type="module">const slug=new URLSearchParams(location.search).get("restaurant");if(slug)document.getElementById("backToDashboard").href="dashboard.html?restaurant="+encodeURIComponent(slug);</script></body></html>
-
+<!doctype html>
+<html lang="ka">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MENIO Partner — შეკვეთები</title>
+<link rel="stylesheet" href="style.css?v=20261014-merchant-board-1">
+<style>
+.merchant-page{width:min(1600px,96%);margin:22px auto 60px}
+.merchant-title{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:24px 0}
+.merchant-title h1{font-size:clamp(30px,4vw,44px);margin:6px 0}
+.board-summary{display:flex;gap:10px;flex-wrap:wrap}
+.summary-chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 13px;font-size:13px;color:var(--ink)}
+.order-board{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:16px;align-items:start;overflow-x:auto;padding:4px 2px 18px}
+.order-lane{min-width:0;background:#f0eee8;border:1px solid #e6e2d8;border-radius:20px;padding:13px;min-height:260px}
+.lane-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 7px 15px}
+.lane-title{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:850;color:#25241f}
+.lane-dot{width:10px;height:10px;border-radius:50%;background:#e7a23c;box-shadow:0 0 0 4px #e7a23c20}
+.lane-preparing .lane-dot{background:#ed683d;box-shadow:0 0 0 4px #ed683d20}
+.lane-ready .lane-dot{background:#379563;box-shadow:0 0 0 4px #37956320}
+.lane-count{min-width:30px;text-align:center;border-radius:999px;padding:5px 9px;background:#fff;color:#55534c;font-size:12px;font-weight:800}
+.lane-cards{display:grid;gap:12px}
+.board-empty{padding:28px 12px;text-align:center;color:#8b887e;border:1px dashed #d6d1c5;border-radius:15px;background:#ffffff70;font-size:13px}
+.order-card{margin:0!important;padding:16px!important;background:#fff!important;border:1px solid #e8e4da!important;border-radius:16px!important;box-shadow:0 6px 18px #25211608!important;color:#25241f!important}
+.order-head{align-items:flex-start;margin-bottom:13px}
+.order-head h2{font-size:17px;line-height:1.4;color:#25241f}
+.order-card .status{font-size:11px;white-space:nowrap}
+.order-card .order-item{font-size:13px;color:#4f4d46;border-color:#f0eee8}
+.order-card .order-item b{white-space:nowrap;color:#25241f}
+.order-card .order-total{font-size:15px;color:#25241f;margin:7px 0}
+.order-card .order-note{background:#f8f6f1;color:#6a665d;font-size:12px;overflow-wrap:anywhere}
+.order-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;color:#77736a;font-size:11px;margin-top:10px}
+.order-actions{display:grid;grid-template-columns:1fr;gap:8px}
+.order-actions button{width:100%;font-size:13px;padding:11px 12px;background:#ed683d;color:#fff}
+.order-actions button.secondary{background:#f1efe9;color:#444139;border:1px solid #e6e2d8}
+.order-actions button:disabled{opacity:.6}
+.board-error{padding:14px 16px;background:#fff1e9;border:1px solid #f1d8cb;color:#8b3d24;border-radius:12px;overflow-wrap:anywhere}
+@media(max-width:760px){.merchant-page{width:94%;margin-top:14px}.order-board{grid-template-columns:repeat(3,minmax(275px,84vw));gap:12px}.merchant-title{margin:18px 0}.merchant-title h1{letter-spacing:-1px}.topbar{align-items:flex-start}.topbar .row{justify-content:flex-end}}
+</style>
+</head>
+<body>
+<main class="merchant-page">
+<header class="topbar">
+<a class="logo" href="index.html">MENIO<span>.</span></a>
+<div class="row"><span class="live-dot"></span><span>ცოცხალი შეკვეთები</span><button id="logout" class="secondary small-button">გასვლა</button></div>
+<a id="backToDashboard" class="btn secondary small-button" href="register.html#login">მართვის პანელი</a>
+</header>
+<div class="merchant-title">
+<div><p class="eyebrow">MENIO PARTNER · LIVE ORDERS</p><h1>შეკვეთების დაფა</h1><p id="status">შეკვეთებს ველოდები…</p></div>
+<div class="board-summary"><span class="summary-chip">🔔 განახლება ავტომატურად</span></div>
+</div>
+<section id="orders" class="order-board" aria-label="შეკვეთების სტატუსები">
+<div class="order-lane lane-incoming"><div class="lane-head"><div class="lane-title"><span class="lane-dot"></span>შემოსული</div><span class="lane-count">0</span></div><div class="lane-cards"></div></div>
+<div class="order-lane lane-preparing"><div class="lane-head"><div class="lane-title"><span class="lane-dot"></span>მზადდება</div><span class="lane-count">0</span></div><div class="lane-cards"></div></div>
+<div class="order-lane lane-ready"><div class="lane-head"><div class="lane-title"><span class="lane-dot"></span>მზადაა</div><span class="lane-count">0</span></div><div class="lane-cards"></div></div>
+</section>
+</main>
+<script type="module" src="merchant.js?v=20261014-merchant-board-1"></script>
+<script type="module">
+const slug=new URLSearchParams(location.search).get("restaurant");
+if(slug)document.getElementById("backToDashboard").href="dashboard.html?restaurant="+encodeURIComponent(slug);
+</script>
+</body>
+</html>
