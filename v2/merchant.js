@@ -7,6 +7,7 @@ const alertedOrders=new Set();
 function beep(){
  if(!soundEnabled)return;
  try{
+  if(window.MenioNative&&typeof window.MenioNative.playOrderAlert==="function"){window.MenioNative.playOrderAlert();return}
   audioContext=audioContext||new (window.AudioContext||window.webkitAudioContext)();
   if(audioContext.state==="suspended")audioContext.resume();
   const now=audioContext.currentTime;
