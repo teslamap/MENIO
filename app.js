@@ -76,8 +76,9 @@ if($("loginForm")) $("loginForm").addEventListener("submit",async event=>{
     const owners=await getDocs(query(collection(db,"restaurantOwners"),where("ownerUid","==",credential.user.uid)));
     if(owners.empty) {
       $("email").value=credential.user.email || "";
-      $("password").value=$("loginPassword").value;
-      msg("ანგარიში არსებობს, მაგრამ რესტორანი ჯერ არ არის შექმნილი. დაასრულე რეგისტრაცია.");
+      // Do not copy the password into the registration form.
+      $("password").value="";
+      msg("ამ ელფოსტით ანგარიში არსებობს, მაგრამ მასთან დაკავშირებული რესტორანი ვერ მოიძებნა. თუ რეგისტრაცია ადრე შეწყდა, შეავსე რესტორნის მონაცემები და იგივე ელფოსტით გააგრძელე.");
       const dialog=$("registerDialog");
       if(dialog && !dialog.open) dialog.showModal();
       $("restaurantName").focus();
