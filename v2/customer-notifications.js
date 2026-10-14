@@ -9,18 +9,40 @@ function setStatus(text){if(status)status.textContent=text;}
 function beep(){
   if(!soundEnabled||!audioContext)return;
   try{
+    // Premium smartphone-style chime: warm, clear notes with a gentle bell-like shimmer.
+    // Boosted envelope improves audibility, but the phone's media volume still applies.
     const now=audioContext.currentTime;
-    [0,0.24,0.48].forEach((offset,index)=>{
-      const oscillator=audioContext.createOscillator();
-      const gain=audioContext.createGain();
-      oscillator.type="sine";
-      oscillator.frequency.value=index===1?1046:880;
-      gain.gain.setValueAtTime(0.0001,now+offset);
-      gain.gain.exponentialRampToValueAtTime(0.22,now+offset+0.025);
-      gain.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.19);
-      oscillator.connect(gain);gain.connect(audioContext.destination);
-      oscillator.start(now+offset);oscillator.stop(now+offset+0.2);
-    });
+    const master=audioContext.createGain();
+    master.gain.setValueAtTime(0.9,now);
+    master.connect(audioContext.destination);
+    const notes=[
+      {at:0, freq:784, length:0.32, level:0.42},
+      {at:0.16, freq:988, length:0.42, level:0.48},
+      {at:0.36, freq:1175, length:0.55, level:0.42}
+    ];
+    for(const note of notes){
+      const osc=audioContext.createOscillator();
+      const env=audioContext.createGain();
+      const shimmer=audioContext.createOscillator();
+      const shimmerGain=audioContext.createGain();
+      osc.type="sine";
+      osc.frequency.setValueAtTime(note.freq,now+note.at);
+      env.gain.setValueAtTime(0.0001,now+note.at);
+      env.gain.exponentialRampToValueAtTime(note.level,now+note.at+0.018);
+      env.gain.exponentialRampToValueAtTime(0.0001,now+note.at+note.length);
+      osc.connect(env);env.connect(master);
+      shimmer.type="sine";
+      shimmer.frequency.setValueAtTime(note.freq*2.01,now+note.at);
+      shimmerGain.gain.setValueAtTime(0.0001,now+note.at);
+      shimmerGain.gain.exponentialRampToValueAtTime(0.075,now+note.at+0.015);
+      shimmerGain.gain.exponentialRampToValueAtTime(0.0001,now+note.at+note.length*0.72);
+      shimmer.connect(shimmerGain);shimmerGain.connect(master);
+      osc.start(now+note.at);osc.stop(now+note.at+note.length+0.02);
+      shimmer.start(now+note.at);shimmer.stop(now+note.at+note.length*0.75+0.02);
+    }
+    master.gain.setValueAtTime(0.9,now+1.05);
+    master.gain.linearRampToValueAtTime(0.0001,now+1.18);
+    setTimeout(()=>{try{master.disconnect();}catch{}},1500);
   }catch(e){console.warn("MENIO sound unavailable",e);}
 }
 async function enableSound(){
