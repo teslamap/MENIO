@@ -395,6 +395,7 @@ onAuthStateChanged(auth,async user => {
     $("restaurantInfo").textContent=restaurant.name;
     renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);
     $("merchantLink").href="merchant.html?restaurant="+encodeURIComponent(slug);
+    $("reportLink").href="report.html?restaurant="+encodeURIComponent(slug);
     $("dashboardContent").hidden=false;
     listen(menuRef,products,() => { renderProducts(); renderCategories(); },() => { productsLoaded = true; });
     listen(categoryRef,categories,renderCategories,() => { categoriesLoaded = true; });
