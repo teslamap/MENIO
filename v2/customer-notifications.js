@@ -27,9 +27,10 @@ function ensurePermissionPrompt(){
  if(permissionPrompt)return permissionPrompt;
  permissionPrompt=document.createElement("dialog");
  permissionPrompt.style.cssText="border:0;border-radius:22px;padding:26px;max-width:380px;width:calc(100% - 40px);box-shadow:0 24px 80px #0005;font-family:inherit;color:#191919;background:#fff";
- permissionPrompt.innerHTML='<div style="font-size:36px;text-align:center">🔔</div><h2 style="margin:8px 0 10px;text-align:center">ჩართე შეკვეთის ხმა</h2><p style="line-height:1.55">შეკვეთის გასაგზავნად ჩართე ხმოვანი შეტყობინება. როცა შეკვეთა მზად იქნება, ხმა განმეორდება მანამ, სანამ „გასაგებია“-ს არ დააჭერ.</p><button id="menioEnableSound" type="button" style="width:100%;border:0;border-radius:12px;padding:14px;background:#f97316;color:white;font-weight:700;font-size:16px;cursor:pointer">ხმის ჩართვა და გაგრძელება</button><button id="menioCancelSound" type="button" style="width:100%;border:1px solid #ddd;border-radius:12px;padding:12px;background:white;margin-top:8px;cursor:pointer">გაუქმება</button>';
+ permissionPrompt.innerHTML='<div style="font-size:36px;text-align:center">🔔</div><h2 style="margin:8px 0 10px;text-align:center">შეკვეთის გაფორმება</h2><p id="menioSoundHelp" style="line-height:1.55">ჩართე ხმა და Push, რომ შეკვეთის მზადყოფნის შეტყობინება მიიღო.</p><button id="menioEnableSound" type="button" style="width:100%;border:0;border-radius:12px;padding:14px;background:#f97316;color:white;font-weight:700;font-size:16px;cursor:pointer">ხმის ჩართვა</button><button id="menioSendAnyway" type="button" style="width:100%;border:0;border-radius:12px;padding:14px;background:#16803c;color:white;font-weight:700;font-size:16px;cursor:pointer;margin-top:8px">მაინც გაგზავნა</button><button id="menioCancelSound" type="button" style="width:100%;border:1px solid #ddd;border-radius:12px;padding:12px;background:white;margin-top:8px;cursor:pointer">გაუქმება</button>';
  permissionPrompt.addEventListener("cancel",e=>{e.preventDefault();resolveEnable(false);});
  permissionPrompt.querySelector("#menioEnableSound").addEventListener("click",activateSound);
+ permissionPrompt.querySelector("#menioSendAnyway").addEventListener("click",()=>{setStatus("შეკვეთა იგზავნება ხმის/Push-ის გარეშე.");resolveEnable(true);});
  permissionPrompt.querySelector("#menioCancelSound").addEventListener("click",()=>resolveEnable(false));
  document.body.append(permissionPrompt);return permissionPrompt;
 }
@@ -43,11 +44,12 @@ async function activateSound(){
   if("Notification" in window&&Notification.permission==="default"){try{await Notification.requestPermission();}catch{}}
   await setupPush();
   if(!pushToken){
-   setStatus("Push ვერ ჩაირთო. შეკვეთის გასაგზავნად დაუშვი ბრაუზერის შეტყობინებები და სცადე ხელახლა.");
-   resolveEnable(false);return;
+   setStatus("Push ვერ ჩაირთო. შეგიძლია მაინც გააგზავნო შეკვეთა.");
+   const help=permissionPrompt?.querySelector("#menioSoundHelp");if(help)help.textContent="ბრაუზერის შეტყობინებები დაბლოკილია ან Push ვერ ჩაირთო. შეგიძლია ტელეფონის საიტის პარამეტრებში ჩართო შეტყობინებები, ან შეკვეთა ახლავე გაგზავნო ხმის/Push-ის გარეშე.";
+   return;
   }
   setStatus("შეკვეთის ხმა და Push ჩართულია ✓");resolveEnable(true);
- }catch(e){setStatus("ხმის ჩართვა ვერ მოხერხდა. სცადე ხელახლა.");resolveEnable(false);}
+ }catch(e){setStatus("ხმის ჩართვა ვერ მოხერხდა. შეგიძლია მაინც გააგზავნო შეკვეთა.");const help=permissionPrompt?.querySelector("#menioSoundHelp");if(help)help.textContent="ხმის ან Push-ის ჩართვა ვერ მოხერხდა. სცადე ხელახლა, ან დააჭირე „მაინც გაგზავნა“-ს.";}
 }
 function ensureEnabled(){
  if(soundEnabled&&audioContext?.state==="running"&&pushToken)return Promise.resolve(true);
