@@ -1,6 +1,6 @@
 import{auth,onAuthStateChanged,signOut,db,doc,deleteDoc}from"./firebase.js";
 import{requireOwner,listenOrders}from"./app.js";
-import{confirmDialog,showToast}from"./ui.js?v=20261014-ui-1";
+import{confirmDialog,showToast}from"./ui.js?v=20261014-ui-2";
 const slug=new URLSearchParams(location.search).get("restaurant"),$=id=>document.getElementById(id);
 const periods={day:{label:"დღეს",start:()=>{const d=new Date();d.setHours(0,0,0,0);return d}},week:{label:"ამ კვირაში",start:()=>{const d=new Date();d.setHours(0,0,0,0);const weekday=(d.getDay()+6)%7;d.setDate(d.getDate()-weekday);return d}},month:{label:"ამ თვეში",start:()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(1);return d}}};
 let period="day",allOrders=[];
