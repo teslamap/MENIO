@@ -201,3 +201,19 @@ p{color:var(--muted)}
 
 /* Keep category tabs directly under the compact sticky header on mobile. */
 @media(max-width:560px){.customer-menu .category-tabs{top:38px;margin-top:0;padding-top:10px}}
+
+/* QR menu opens on square category cards; products appear after selecting a category. */
+.customer-menu .menu-intro{display:none!important}
+.customer-menu .category-tabs[hidden]{display:none!important}
+.customer-menu .category-landing-title{font-size:clamp(22px,3vw,30px);margin:22px 0 18px;color:#25251f}
+.customer-menu .category-square-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:0 0 36px}
+.customer-menu .category-square{position:relative;display:flex;align-items:flex-end;justify-content:flex-start;isolation:isolate;aspect-ratio:1/1;min-width:0;overflow:hidden;padding:0;border:1px solid #e9e3d9;border-radius:20px;background:#ede6db;color:#fff;text-align:left;box-shadow:0 8px 24px #30251d0d;cursor:pointer}
+.customer-menu .category-square:after{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,#1111 10%,#1110 35%,#15130fdb 100%)}
+.customer-menu .category-square-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;transition:transform .25s}
+.customer-menu .category-square:hover .category-square-photo{transform:scale(1.05)}
+.customer-menu .category-square-name{position:relative;z-index:1;display:block;width:100%;padding:14px 12px;font-size:clamp(13px,1.35vw,17px);font-weight:800;line-height:1.35;overflow-wrap:anywhere;text-shadow:0 1px 8px #0008}
+.customer-menu .category-square-no-photo{background:linear-gradient(145deg,#f2d6c5,#bd6848 60%,#773d2b)}
+.customer-menu .category-square-no-photo:after{background:linear-gradient(180deg,#2a160f12,#24140f88)}
+.customer-menu .category-back{margin:8px 0 18px;border-radius:999px;background:#fff;border-color:#e9e7df;color:#4b463d}
+@media(max-width:850px){.customer-menu .category-square-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
+@media(max-width:560px){.customer-menu .category-landing-title{margin:18px 14px 14px;font-size:22px}.customer-menu .category-square-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 12px}.customer-menu .category-square{border-radius:16px}.customer-menu .category-square-name{padding:11px 10px;font-size:14px}.customer-menu .category-back{margin-left:12px}}
