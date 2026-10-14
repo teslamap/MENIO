@@ -17,7 +17,12 @@ function ensureDialog(){
  readyDialog.querySelector("#menioReadyAck").addEventListener("click",()=>{stopRepeating();readyDialog.close();setStatus("შეკვეთის მზადყოფნა დადასტურებულია ✓");});
  document.body.append(readyDialog);return readyDialog;
 }
-function resolveEnable(value){if(permissionPrompt?.open)permissionPrompt.close();if(enableResolver){const resolve=enableResolver;enableResolver=null;resolve(value);}}
+function resolveEnable(value){
+ const resolve=enableResolver;
+ enableResolver=null;
+ if(permissionPrompt?.open)permissionPrompt.close();
+ if(resolve)resolve(value);
+}
 function ensurePermissionPrompt(){
  if(permissionPrompt)return permissionPrompt;
  permissionPrompt=document.createElement("dialog");
@@ -43,7 +48,13 @@ async function activateSound(){
 function ensureEnabled(){
  if(soundEnabled&&audioContext?.state==="running")return Promise.resolve(true);
  ensurePermissionPrompt();
- return new Promise(resolve=>{enableResolver=resolve;if(!permissionPrompt.open)permissionPrompt.showModal();});
+ // Every checkout attempt must be able to reopen the prompt after a previous cancellation/failure.
+ return new Promise(resolve=>{
+  if(enableResolver){const previous=enableResolver;enableResolver=null;previous(false);}
+  enableResolver=resolve;
+  try{if(!permissionPrompt.open)permissionPrompt.showModal();}
+  catch(error){enableResolver=null;console.warn("MENIO sound prompt could not open",error);resolve(false);}
+ });
 }
 
 async function setupPush(){
