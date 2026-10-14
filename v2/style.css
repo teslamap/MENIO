@@ -197,3 +197,7 @@ p{color:var(--muted)}
 .customer-menu .language-option.is-active{background:#fff0e8;color:#c9502d}
 .customer-menu .language-native-select{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;opacity:0!important;pointer-events:none!important}
 @media(max-width:560px){.customer-menu .language-trigger{min-height:32px;padding:6px 8px;gap:4px;font-size:10px}.customer-menu .language-trigger #languageFlag{font-size:14px}.customer-menu .language-options{width:140px}}
+
+
+/* Keep category tabs directly under the compact sticky header on mobile. */
+@media(max-width:560px){.customer-menu .category-tabs{top:38px;margin-top:0;padding-top:10px}}
