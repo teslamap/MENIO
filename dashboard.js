@@ -404,7 +404,17 @@ $("logout").onclick = async () => {
 };
 let initialized=false;
 onAuthStateChanged(auth,async user => {
-  if (!user || user.isAnonymous) { location.replace("register.html#login"); return; }
+  // Wait for Firebase to finish restoring browser-local auth before deciding
+  // that the session is missing. This avoids redirecting during auth startup.
+  try { await auth.authStateReady(); } catch {}
+  user = auth.currentUser || user;
+  if (!user || user.isAnonymous) {
+    $("restaurantInfo").textContent="შესვლა საჭიროა";
+    say("სესია ვერ აღდგა ამ გვერდზე. დააჭირე შესვლას და ხელახლა შედი; თუ პრობლემა განმეორდება, შეამოწმე ბრაუზერის cookies/local storage.");
+    const login=document.createElement("a"); login.href="register.html#login"; login.className="btn"; login.textContent="შესვლა";
+    $("businessMessage").append(" ",login);
+    return;
+  }
   if (initialized || stopped) return; initialized=true;
   try {
     if (!slug) throw Error("რესტორანი არ არის არჩეული. შედი ანგარიშში ხელახლა.");
