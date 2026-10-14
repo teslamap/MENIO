@@ -16,10 +16,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -28,5 +26,13 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "1.0.1"
+    }
+}
+
+
+// Keep Kotlin bytecode aligned with Java 17 for every Kotlin compile task.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
