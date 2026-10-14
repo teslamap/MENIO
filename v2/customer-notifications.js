@@ -37,9 +37,9 @@ function ensurePermissionPrompt(){
 async function activateSound(){
  try{
   const C=window.AudioContext||window.webkitAudioContext;
-  if(!C){setStatus("ამ ბრაუზერში ხმა მიუწვდომელია.");resolveEnable(false);return;}
+  if(!C){setStatus("ამ ბრაუზერში ხმა მიუწვდომელია. შეგიძლია მაინც გააგზავნო შეკვეთა.");const help=permissionPrompt?.querySelector("#menioSoundHelp");if(help)help.textContent="ამ ბრაუზერში ხმა მიუწვდომელია. შეგიძლია შეკვეთა ხმის/Push-ის გარეშე გაგზავნო ქვემოთ მოცემული ღილაკით.";return;}
   audioContext ||= new C();if(audioContext.state==="suspended")await audioContext.resume();
-  soundEnabled=audioContext.state==="running";if(!soundEnabled){resolveEnable(false);return;}
+  soundEnabled=audioContext.state==="running";if(!soundEnabled){setStatus("ხმის ჩართვა ვერ მოხერხდა. შეგიძლია მაინც გააგზავნო შეკვეთა.");const help=permissionPrompt?.querySelector("#menioSoundHelp");if(help)help.textContent="ხმის ჩართვა ვერ მოხერხდა. სცადე ხელახლა, ან დააჭირე „მაინც გაგზავნა“-ს.";return;}
   playChime();
   if("Notification" in window&&Notification.permission==="default"){try{await Notification.requestPermission();}catch{}}
   await setupPush();
