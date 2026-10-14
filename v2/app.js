@@ -83,13 +83,20 @@ if($("loginForm")) $("loginForm").addEventListener("submit",async event=>{
       $("restaurantName").focus();
       return;
     }
-    if(owners.size===1) location.href="dashboard.html?restaurant="+encodeURIComponent(owners.docs[0].id);
-    else {
+    const returnTo=new URLSearchParams(location.search).get("returnTo");
+    const requestedRestaurant=new URLSearchParams(location.search).get("restaurant");
+    const merchantReturn=returnTo==="merchant";
+    if(owners.size===1) {
+      const ownerSlug=owners.docs[0].id;
+      location.href=merchantReturn
+        ? "merchant.html?restaurant="+encodeURIComponent(owners.docs.some(item=>item.id===requestedRestaurant)?requestedRestaurant:ownerSlug)
+        : "dashboard.html?restaurant="+encodeURIComponent(ownerSlug);
+    } else {
       const list=$("restaurantChoices"); list.replaceChildren();
       for(const owner of owners.docs) {
         const restaurant=await getDoc(doc(db,"restaurants",owner.id));
         const link=document.createElement("a"); link.className="btn secondary";
-        link.href="dashboard.html?restaurant="+encodeURIComponent(owner.id);
+        link.href=(merchantReturn?"merchant.html":"dashboard.html")+"?restaurant="+encodeURIComponent(owner.id);
         link.textContent=restaurant.exists() ? restaurant.data().name : owner.id;
         list.append(link);
       }
