@@ -239,6 +239,9 @@ $("dishImage").onchange = () => {
 $("cancelEdit").onclick = resetProduct;
 $("cancelCategory").onclick = resetCategory;
 $("productFilter").onchange = renderProducts;
+$("brandNavLink").onclick = event => { event.preventDefault(); $("brandDialog").showModal(); };
+$("closeBrandDialog").onclick = () => $("brandDialog").close();
+$("brandDialog").addEventListener("click", event => { if (event.target === $("brandDialog")) $("brandDialog").close(); });
 $("appearanceNavLink").onclick = event => { event.preventDefault(); $("appearanceDialog").showModal(); };
 $("closeAppearanceDialog").onclick = () => $("appearanceDialog").close();
 $("tablesNavLink").onclick = event => { event.preventDefault(); $("tableDialog").showModal(); };
