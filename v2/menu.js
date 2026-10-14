@@ -1,8 +1,8 @@
-import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAnonymously,onAuthStateChanged} from "./firebase.js";
+import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAnonymously,onAuthStateChanged,query,where} from "./firebase.js";
 import { safeProductImage } from "./image-utils.js";
 const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table"));
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
-let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false;
+let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false, ordersUnsubscribe=null;
 let detailId=null;
 $("cartSummary").onclick=()=>$("orderBox").showModal();
 $("cartClose").onclick=()=>$("orderBox").close();
@@ -125,8 +125,42 @@ function reconcileCart(){
   drawCart();
 }
 const authReady=new Promise(resolve=>{const stop=onAuthStateChanged(auth,()=>{stop();resolve();});});
+const orderStatuses={new:"მიღებულია",accepted:"მიღებულია",preparing:"მზადდება",completed:"მზადაა",cancelled:"გაუქმებულია"};
+function renderCustomerOrders(snapshot){
+  const root=$("myOrdersList");root.replaceChildren();
+  const orders=snapshot.docs.map(d=>({...d.data(),id:d.id})).filter(o=>o.restaurantSlug===slug).sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+  if(!orders.length){root.append(el("div","ჯერ შეკვეთა არ გაგიფორმებია.","orders-empty"));return;}
+  for(const order of orders){
+    const card=el("article",undefined,"customer-order-card");
+    const head=el("div",undefined,"customer-order-head");
+    head.append(el("strong","შეკვეთა № "+order.id.slice(-6).toUpperCase()),el("span",orderStatuses[order.status]||order.status||"სტატუსი უცნობია","customer-order-status status-"+(order.status||"new")));
+    card.append(head);
+    card.append(el("p",(order.items||[]).map(i=>(i.name||"პროდუქტი")+" × "+(i.quantity||1)).join(" · "),"customer-order-items"));
+    const meta=el("div",undefined,"customer-order-meta");
+    meta.append(el("span","მაგიდა №"+(order.tableNumber||table)),el("strong",money(order.total||0)));
+    card.append(meta);
+    if(order.note)card.append(el("p","შენიშვნა: "+order.note,"customer-order-note"));
+    if(order.status==="completed")card.append(el("p","შენი შეკვეთა მზადაა! შეგიძლია აიღო.","customer-order-ready"));
+    if(order.status==="cancelled")card.append(el("p","ეს შეკვეთა გაუქმებულია.","customer-order-note"));
+    root.append(card);
+  }
+}
+function listenCustomerOrders(){
+  if(!auth.currentUser)return;
+  ordersUnsubscribe?.();
+  const q=query(collection(db,"orders"),where("customerUid","==",auth.currentUser.uid));
+  ordersUnsubscribe=onSnapshot(q,renderCustomerOrders,error=>{
+    $("myOrdersList").replaceChildren(el("p","შეკვეთების ჩატვირთვა ვერ მოხერხდა. განაახლე გვერდი და სცადე ხელახლა.","orders-error"));
+  });
+}
+$("myOrdersButton").onclick=()=>{if(!$("myOrdersDialog").open)$("myOrdersDialog").showModal();};
+$("myOrdersClose").onclick=()=>$("myOrdersDialog").close();
+$("myOrdersDialog").addEventListener("click",event=>{if(event.target===$("myOrdersDialog"))$("myOrdersDialog").close();});
 async function init(){
   if(!slug || !Number.isSafeInteger(table) || table<1)throw Error("QR ბმული არასწორია");
+  await authReady;
+  if(!auth.currentUser)await signInAnonymously(auth);
+  listenCustomerOrders();
   const [rs,ts]=await Promise.all([getDoc(doc(db,"restaurants",slug)),getDoc(doc(db,"restaurants",slug,"tables",String(table)))]);
   if(!rs.exists() || !rs.data().active || !ts.exists() || !ts.data().active)throw Error("რესტორანი ან მაგიდა მიუწვდომელია");
   restaurant=rs.data();$("restaurantName").textContent=restaurant.name;
@@ -150,13 +184,13 @@ async function send(){
     if(!auth.currentUser)await signInAnonymously(auth);
     const items=[...cart.values()].map(item=>({...item})),total=Math.round(items.reduce((sum,item)=>sum+item.price*item.quantity,0)*100)/100;
     await addDoc(collection(db,"orders"),{
-      restaurantSlug:slug,restaurantName:restaurant.name,tableNumber:table,tableId:String(table),items,
+      restaurantSlug:slug,restaurantName:restaurant.name,customerUid:auth.currentUser.uid,tableNumber:table,tableId:String(table),items,
       note:$("note").value.trim(),total,status:"new",paymentStatus:"unpaid",createdAt:serverTimestamp()
     });
     cart.clear();$("note").value="";say("შეკვეთა გაიგზავნა!");
   }catch(error){say("შეკვეთა ვერ გაიგზავნა: "+error.message);}
   finally{sending=false;render();drawCart();}
 }
-window.addEventListener("pagehide",()=>unsubscribers.forEach(stop=>stop()));
+window.addEventListener("pagehide",()=>{unsubscribers.forEach(stop=>stop());ordersUnsubscribe?.();});
 init().catch(error=>{ready=false;drawCart();say(error.message);$("restaurantName").textContent="მენიუ მიუწვდომელია";});
 
