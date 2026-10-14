@@ -10,7 +10,7 @@ const $ = id => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get("restaurant");
 const products = new Map(), categories = new Map(), tables = new Map();
 const unsubscribers = [];
-let imageObjectURL, stopped = false, productsLoaded = false, categoriesLoaded = false, pendingMenuImport = [];
+let imageObjectURL, stopped = false, productsLoaded = false, categoriesLoaded = false, pendingMenuImport = [], restaurantLogoPreviewUrl;
 const DEFAULT_THEME_COLOR = "#f97316";
 const MENU_IMPORT_CATEGORIES = new Set(["ბურგერი","ქათმის ხორცი","საქონლის ხორცი","ღორის ხორცი","კრევეტები","ზღვის პროდუქტები","ვეგეტარიანული","ხაჭაპური","პიცა","პასტა","სუში","სალათი","წვნინანები","სენდვიჩი","სნექი","გამაგრილებელი სასმელი","იაპონური ლიმონათი","ყავა","ლუდი","საკე","კორეული არაყი","ვისკი","დანამატი"]);
 function parseMenuImport(text) {
@@ -317,7 +317,10 @@ $("importMenuSubmit").onclick = async () => {
   } catch(error) { say("იმპორტი ვერ დასრულდა: " + error.message); }
   finally { button.disabled = !pendingMenuImport.length; }
 };
-$("themeColor").oninput = event => renderTheme(event.target.value);
+$("restaurantLogoFile").onchange=()=>{const file=$("restaurantLogoFile").files[0],preview=$("restaurantLogoPreview");if(restaurantLogoPreviewUrl)URL.revokeObjectURL(restaurantLogoPreviewUrl);restaurantLogoPreviewUrl="";if(!file){preview.hidden=true;preview.removeAttribute("src");return;}if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>5*1024*1024){$("restaurantLogoFile").value="";say("ლოგო უნდა იყოს JPEG, PNG ან WebP და მაქსიმუმ 5 MB.");return;}restaurantLogoPreviewUrl=URL.createObjectURL(file);preview.src=restaurantLogoPreviewUrl;preview.hidden=false;};
+$("saveRestaurantLogo").onclick=async()=>{const button=$("saveRestaurantLogo"),file=$("restaurantLogoFile").files[0];button.disabled=true;try{if(!file)throw Error("ჯერ აირჩიე ლოგოს ფაილი.");const restaurantLogo=await encodeProductPhoto(file);await updateDoc(doc(db,"restaurants",slug),{restaurantLogo});say("რესტორნის ლოგო შენახულია და QR მენიუში გამოჩნდება.");}catch(error){say("ლოგოს შენახვა ვერ მოხერხდა: "+error.message);}finally{button.disabled=false;}};
+$("removeRestaurantLogo").onclick=async()=>{const button=$("removeRestaurantLogo");button.disabled=true;try{await updateDoc(doc(db,"restaurants",slug),{restaurantLogo:""});$("restaurantLogoFile").value="";$("restaurantLogoPreview").hidden=true;say("რესტორნის ლოგო წაიშალა.");}catch(error){say("ლოგოს წაშლა ვერ მოხერხდა: "+error.message);}finally{button.disabled=false;}};
+\n$("themeColor").oninput = event => renderTheme(event.target.value);
 $("saveTheme").onclick = async () => {
   const button = $("saveTheme"); button.disabled = true;
   try {
@@ -394,7 +397,7 @@ onAuthStateChanged(auth,async user => {
     if (!slug) throw Error("რესტორანი არ არის არჩეული. შედი ანგარიშში ხელახლა.");
     const restaurant=await requireOwner(slug);
     $("restaurantInfo").textContent=restaurant.name;
-    renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);
+    renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);if(restaurant.restaurantLogo){$("restaurantLogoPreview").src=restaurant.restaurantLogo;$("restaurantLogoPreview").hidden=false;}
     $("merchantLink").href="merchant.html?restaurant="+encodeURIComponent(slug);
     $("reportLink").href="report.html?restaurant="+encodeURIComponent(slug);
     $("dashboardContent").hidden=false;
@@ -405,6 +408,6 @@ onAuthStateChanged(auth,async user => {
 });
 window.addEventListener("pagehide",() => {
   stopped=true; unsubscribers.forEach(unsubscribe => unsubscribe());
-  if(imageObjectURL) URL.revokeObjectURL(imageObjectURL);
+  if(imageObjectURL) URL.revokeObjectURL(imageObjectURL);if(restaurantLogoPreviewUrl)URL.revokeObjectURL(restaurantLogoPreviewUrl);
 });
 
