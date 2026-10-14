@@ -127,3 +127,25 @@ p{color:var(--muted)}
 .orders-empty{padding:22px;text-align:center;border:1px dashed #ffffff25;border-radius:14px;color:#b9bdc9}
 .orders-error{padding:14px;background:#3d2429;border-radius:12px;color:#ffb8c0}
 @media(max-width:560px){.menu-header{align-items:flex-start}.menu-header-actions{gap:6px}.my-orders-button{font-size:12px;padding:9px 10px}.orders-dialog-content{padding:22px 16px}}
+
+/* Mobile menu header: full-bleed, rounded controls, no left gutter */
+@media(max-width:560px){
+  .customer-menu .container{width:100%;margin:0 auto 70px}
+  .customer-menu .menu-header{
+    width:100%;
+    margin:0;
+    padding:12px 12px;
+    border-radius:0 0 18px 18px;
+    gap:10px;
+  }
+  .customer-menu .menu-header .logo{flex-shrink:0}
+  .customer-menu .menu-header-actions{gap:6px;max-width:100%}
+  .customer-menu .menu-header-actions button,
+  .customer-menu .menu-header-actions .language-trigger,
+  .customer-menu .menu-header-actions .pill{
+    border-radius:999px;
+  }
+  .customer-menu .menu-header-actions .language-trigger{padding:9px 11px}
+  .customer-menu .my-orders-button{border-radius:999px;white-space:nowrap}
+  .customer-menu .header-cart{border-radius:999px;white-space:nowrap}
+}
