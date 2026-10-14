@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ka">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MENIO — ანგარიშგება</title>
+<link rel="stylesheet" href="style.css?v=20261014-reports-1">
+<style>
+.report-page{width:min(1400px,95%);margin:24px auto 70px}.report-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:28px 0}.report-heading h1{font-size:clamp(30px,4vw,44px);margin:8px 0}.report-controls{display:flex;gap:8px;flex-wrap:wrap}.period-btn{background:#fff;color:#5c554c;border:1px solid var(--line);padding:11px 16px}.period-btn[aria-pressed=true]{background:#ed683d;color:#fff;border-color:#ed683d}.report-note{padding:14px 16px;border:1px solid #f1d8cb;background:#fff5ef;border-radius:14px;color:#7d503f;font-size:13px;line-height:1.7}.report-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:20px 0}.report-stat{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;min-width:0;box-shadow:0 8px 24px #25211608}.report-stat span{display:block;color:var(--muted);font-size:13px;margin-bottom:12px}.report-stat strong{display:block;font-size:clamp(22px,3vw,32px);line-height:1.25;overflow-wrap:anywhere;color:var(--ink)}.report-stat small{display:block;margin-top:8px;line-height:1.5}.report-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}.report-panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:24px;min-width:0;box-shadow:0 8px 24px #25211608}.report-panel h2{font-size:20px;margin:0 0 18px}.insight-list{display:grid;gap:0}.insight{padding:14px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.insight:last-child{border-bottom:0}.insight span{color:var(--muted);font-size:13px}.insight strong{text-align:right;overflow-wrap:anywhere}.report-summary{line-height:1.85;color:var(--ink);font-size:14px}.report-summary p{margin:0 0 10px}.report-summary strong{color:#b94e2d}.report-table-wrap{overflow:auto}.report-table{width:100%;border-collapse:collapse;font-size:13px}.report-table th,.report-table td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);white-space:nowrap}.report-table th{color:var(--muted);font-weight:700}.report-table td:last-child,.report-table th:last-child{text-align:right}.report-empty{padding:24px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}.report-error{padding:14px;background:#fff1e9;color:#8b3d24;border-radius:12px;overflow-wrap:anywhere}.report-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:22px}.report-footer p{font-size:12px}.report-page .eyebrow{margin-top:0}
+@media(max-width:900px){.report-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.report-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.report-page{width:92%;margin-top:14px}.report-heading{margin:20px 0}.report-stats{gap:9px}.report-stat{padding:14px}.report-stat span{font-size:11px}.report-stat strong{font-size:23px}.report-panel{padding:18px}.topbar{align-items:flex-start}.topbar .row{justify-content:flex-end}}
+</style>
+</head>
+<body>
+<main class="report-page">
+<header class="topbar">
+<a class="logo" href="index.html">MENIO<span>.</span></a>
+<div class="row"><span class="live-dot"></span><span>ანგარიშგება</span><button id="logout" class="secondary small-button">გასვლა</button></div>
+<a id="backToDashboard" class="btn secondary small-button" href="register.html#login">მართვის პანელი</a>
+</header>
+<section class="report-heading">
+<div><p class="eyebrow">MENIO PARTNER · BUSINESS INTELLIGENCE</p><h1>შემოსავლები და სტატისტიკა</h1><p id="reportStatus">მონაცემებს ვტვირთავ…</p></div>
+<div class="report-controls" role="group" aria-label="საანგარიშო პერიოდი">
+<button class="period-btn" data-period="day" aria-pressed="true">1 დღე</button>
+<button class="period-btn" data-period="week" aria-pressed="false">1 კვირა</button>
+<button class="period-btn" data-period="month" aria-pressed="false">1 თვე</button>
+</div>
+</section>
+<div class="report-note">ანგარიში ითვლის შეკვეთებს შექმნის თარიღით. „მიღებული შემოსავალი“ ითვლის მხოლოდ გადახდილ, გაუქმების არმქონე შეკვეთებს; „გაყიდვების ჯამი“ მოიცავს გადაუხდელ შეკვეთებსაც. დაფიდან მოცილებული შეკვეთები ანგარიშში რჩება.</div>
+<section class="report-stats">
+<article class="report-stat"><span>მიღებული შემოსავალი</span><strong id="paidRevenue">0.00 ₾</strong><small>გადახდილი შეკვეთები</small></article>
+<article class="report-stat"><span>გაყიდვების ჯამი</span><strong id="grossSales">0.00 ₾</strong><small>გაუქმებულის გარეშე</small></article>
+<article class="report-stat"><span>გადასახდელი თანხა</span><strong id="outstanding">0.00 ₾</strong><small>ჯერ გადაუხდელი</small></article>
+<article class="report-stat"><span>შეკვეთები</span><strong id="orderCount">0</strong><small id="orderCountNote">გაუქმებულის გარეშე</small></article>
+</section>
+<section class="report-grid">
+<article class="report-panel"><h2>მოკლე ანგარიში</h2><div id="summaryText" class="report-summary"><p>მონაცემები იტვირთება…</p></div></article>
+<article class="report-panel"><h2>ძირითადი მაჩვენებლები</h2><div id="insights" class="insight-list"></div></article>
+</section>
+<section class="report-panel" style="margin-top:16px"><div class="section-heading"><div><h2>ყველაზე მოთხოვნადი პროდუქტები</h2><p>არჩეულ პერიოდში გაყიდული რაოდენობით</p></div></div><div id="topProducts" class="report-table-wrap"><div class="report-empty">მონაცემები იტვირთება…</div></div></section>
+<div class="report-footer"><p id="periodLabel">პერიოდი: დღეს</p><button id="exportCsv" class="secondary">CSV ანგარიშის ჩამოტვირთვა</button></div>
+</main>
+<script type="module" src="report.js?v=20261014-reports-1"></script>
+<script type="module">
+const slug=new URLSearchParams(location.search).get("restaurant");
+if(slug)document.getElementById("backToDashboard").href="dashboard.html?restaurant="+encodeURIComponent(slug);
+</script>
+</body>
+</html>
