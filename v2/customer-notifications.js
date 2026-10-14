@@ -1,5 +1,10 @@
 import {auth,db,collection,query,where,onSnapshot,onAuthStateChanged} from "./firebase.js";
-let audioContext=null,soundEnabled=false,seenStatuses=new Map(),unsubscribe=null,repeatTimer=null,readyDialog=null,permissionPrompt=null,enableResolver=null;
+import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-messaging.js";
+import {initializeApp,getApps} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+
+// Paste the Web Push certificate key from Firebase Console > Project settings > Cloud Messaging.
+const VAPID_PUBLIC_KEY = "";
+let audioContext=null,soundEnabled=false,seenStatuses=new Map(),unsubscribe=null,repeatTimer=null,readyDialog=null,permissionPrompt=null,enableResolver=null,pushToken=null;
 const $=id=>document.getElementById(id),status=$("orderSoundStatus");
 function setStatus(text){if(status)status.textContent=text;}
 function ensureDialog(){
@@ -39,7 +44,18 @@ function ensureEnabled(){
  ensurePermissionPrompt();
  return new Promise(resolve=>{enableResolver=resolve;if(!permissionPrompt.open)permissionPrompt.showModal();});
 }
-function playChime(){
+
+async function setupPush(){
+  if(!("Notification" in window)||Notification.permission!=="granted"||!("serviceWorker" in navigator)||!VAPID_PUBLIC_KEY)return null;
+  try{
+    const registration=await navigator.serviceWorker.register(new URL("../firebase-messaging-sw.js",import.meta.url),{scope:"../"});
+    const app=getApps()[0]||initializeApp({apiKey:"AIzaSyDghOTPxpYXBGijyZMJTL3SxTazB881YMo",authDomain:"menio-8de8f.firebaseapp.com",projectId:"menio-8de8f",messagingSenderId:"429553713786",appId:"1:429553713786:web:bf1325a209c917bd4db1c3"});
+    const messaging=getMessaging(app);
+    pushToken=await getToken(messaging,{vapidKey:VAPID_PUBLIC_KEY,serviceWorkerRegistration:registration});
+    return pushToken||null;
+  }catch(error){console.warn("MENIO Push setup failed",error);return null;}
+}
+\nfunction playChime(){
  if(!soundEnabled||!audioContext||audioContext.state!=="running")return;
  try{
   const now=audioContext.currentTime,master=audioContext.createGain();master.gain.setValueAtTime(0.95,now);master.connect(audioContext.destination);
@@ -72,5 +88,5 @@ function watchOrders(user){
  },error=>{console.warn("MENIO order notification listener",error);setStatus("შეკვეთების შეტყობინება ვერ ჩაიტვირთა.");});
 }
 onAuthStateChanged(auth,user=>{if(user)watchOrders(user);});
-window.MENIOSound={ensureEnabled,isEnabled:()=>soundEnabled};
+window.MENIOSound={ensureEnabled,isEnabled:()=>soundEnabled,getPushToken:()=>pushToken};
 window.addEventListener("pagehide",()=>{stopRepeating();unsubscribe?.();});
