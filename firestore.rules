@@ -99,10 +99,13 @@ service cloud.firestore {
     }
 
     match /restaurantOwners/{slug} {
-      // A missing owner record may be read during a uniqueness check; existing records are private.
-      allow read: if isPlatformAdmin() || (signedIn()
+      // A missing owner record may be checked by an authenticated registrant.
+      // Existing owner records remain private; login queries must constrain ownerUid.
+      allow get: if isPlatformAdmin() || (signedIn()
         && (!exists(/databases/$(database)/documents/restaurantOwners/$(slug))
           || resource.data.ownerUid == request.auth.uid));
+      allow list: if isPlatformAdmin() || (signedIn()
+        && resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
         && request.resource.data.ownerUid == request.auth.uid
