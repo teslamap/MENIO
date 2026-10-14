@@ -1,5 +1,6 @@
 import{auth,onAuthStateChanged,signOut,db,doc,deleteDoc}from"./firebase.js";
 import{requireOwner,listenOrders}from"./app.js";
+import{confirmDialog,showToast}from"./ui.js?v=20261014-ui-1";
 const slug=new URLSearchParams(location.search).get("restaurant"),$=id=>document.getElementById(id);
 const periods={day:{label:"დღეს",start:()=>{const d=new Date();d.setHours(0,0,0,0);return d}},week:{label:"ამ კვირაში",start:()=>{const d=new Date();d.setHours(0,0,0,0);const weekday=(d.getDay()+6)%7;d.setDate(d.getDate()-weekday);return d}},month:{label:"ამ თვეში",start:()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(1);return d}}};
 let period="day",allOrders=[];
@@ -28,10 +29,10 @@ function renderOrdersPopup(){
   foot.append(make("span","",((statusMap[order.status]||order.status||"სტატუსი უცნობია")+" · "+(order.paymentStatus==="paid"?"გადახდილია":"გადასახდელია"))),make("strong","",money(order.total)));
   const del=make("button","history-order-delete","წაშლა");
   del.type="button";del.onclick=async()=>{
-   if(!confirm("ნამდვილად წავშალოთ ეს შეკვეთა სამუდამოდ? ეს მოქმედება ანგარიშგებიდანაც ამოიღებს შეკვეთას და უკან ვერ დაბრუნდება."))return;
+   if(!await confirmDialog("ნამდვილად წავშალოთ ეს შეკვეთა სამუდამოდ? ეს მოქმედება ანგარიშგებიდანაც ამოიღებს შეკვეთას და უკან ვერ დაბრუნდება.",{title:"შეკვეთის სამუდამოდ წაშლა",danger:true,confirmText:"სამუდამოდ წაშლა"}))return;
    del.disabled=true;del.textContent="იშლება…";
    try{await deleteDoc(doc(db,"orders",order.id));allOrders=allOrders.filter(o=>o.id!==order.id);render()}
-   catch(e){alert("შეკვეთის წაშლა ვერ მოხერხდა: "+e.message);del.disabled=false;del.textContent="წაშლა"}
+   catch(e){showToast("შეკვეთის წაშლა ვერ მოხერხდა: "+e.message,"error");del.disabled=false;del.textContent="წაშლა"}
   };
   card.append(head,items,foot,del);currentList.append(card);
  }
