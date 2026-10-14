@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MENIO Partner — სატესტო მერჩანტი</title>
-<link rel="stylesheet" href="style.css?v=20261014-merchant-landscape-1">
+<link rel="stylesheet" href="style.css?v=20261014-merchant-apk-sound-1">
 <style>
 :root{--accent-color:#ed683d;--line:#ecebe6;--ink:#22221d;--muted:#77766f}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#fff!important;color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI","Noto Sans Georgian",sans-serif}
@@ -12,7 +12,7 @@
 .demo-topbar{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px;padding-bottom:12px;border-bottom:1px solid #ecebe7}
 .brand{font-size:23px;font-weight:900;letter-spacing:-1.4px;text-decoration:none;color:#20201c}.brand span{color:#ed683d}
 .live{display:flex;align-items:center;justify-content:center;gap:9px;color:#66655e;font-size:12px;font-weight:750}.live-dot{width:8px;height:8px;border-radius:50%;background:#22a66a;box-shadow:0 0 0 4px #22a66a19}
-.top-actions{display:flex;align-items:center;gap:8px}.top-actions button{padding:9px 12px;border-radius:10px;font-size:11px}
+.top-actions{display:flex;align-items:center;gap:8px}.top-actions button{padding:9px 12px;border-radius:10px;font-size:11px}#soundToggle{background:#fff7f2;border:1px solid #f3d5c7;color:#a94725;font-weight:800;white-space:nowrap}#soundToggle.sound-on{background:#eaf8ef;border-color:#c8ebd4;color:#207346}
 .demo-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;flex:0 0 auto}.kicker{font-size:9px;letter-spacing:1.7px;font-weight:850;color:#e75f35;margin:0 0 3px}.demo-heading h1{font-size:clamp(22px,2.2vw,30px);letter-spacing:-.7px;line-height:1.2;margin:0}.subline{font-size:11px;color:#77766f;margin:5px 0 0}.heading-actions{display:flex;align-items:center;gap:8px}.demo-pill{padding:8px 11px;background:#f8f7f4;border:1px solid #eeece6;border-radius:10px;color:#626159;font-size:10px;font-weight:700;white-space:nowrap}
 .board{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .lane{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;background:#f8f8f6;border:1px solid #ecebe7;border-radius:16px;padding:10px}
@@ -37,7 +37,7 @@
 <header class="demo-topbar">
 <a class="brand" href="../index.html">MENIO<span>.</span></a>
 <div class="live"><span class="live-dot"></span><span>Delicate · სატესტო მერჩანტი</span><span class="demo-pill">LIVE DEMO</span></div>
-<div class="top-actions"><button id="addOrder">＋ სატესტო შეკვეთა</button><a class="btn secondary" href="merchant.html?restaurant=delicate">რეალურ მერჩანტზე ↗</a></div>
+<div class="top-actions"><button id="soundToggle" type="button" aria-pressed="false">🔇 ხმის ჩართვა</button><button id="addOrder">＋ სატესტო შეკვეთა</button><a class="btn secondary" href="merchant.html?restaurant=delicate">რეალურ მერჩანტზე ↗</a></div>
 </header>
 <section class="demo-heading">
 <div><p class="kicker">MENIO PARTNER · ORDER MANAGEMENT</p><h1>შეკვეთების დაფა</h1><p class="subline" id="summary">სატესტო რეჟიმი · შეკვეთები ამ გვერდზე იმიტირებულია</p></div>
@@ -76,9 +76,12 @@ function renderCard(o){
  if(actions.childElementCount)card.append(actions);
  return card;
 }
+let soundEnabled=false,audioContext=null;
+function playAlert(){if(!soundEnabled)return;try{audioContext=audioContext||new (window.AudioContext||window.webkitAudioContext)();if(audioContext.state==="suspended")audioContext.resume();const now=audioContext.currentTime;[0,.22,.44].forEach((offset,i)=>{const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type="sine";osc.frequency.value=i===1?1046:880;gain.gain.setValueAtTime(.0001,now+offset);gain.gain.exponentialRampToValueAtTime(.24,now+offset+.025);gain.gain.exponentialRampToValueAtTime(.0001,now+offset+.18);osc.connect(gain);gain.connect(audioContext.destination);osc.start(now+offset);osc.stop(now+offset+.2)})}catch(e){console.warn("Sound unavailable",e)}}
+document.getElementById("soundToggle").onclick=async()=>{try{audioContext=audioContext||new (window.AudioContext||window.webkitAudioContext)();await audioContext.resume();soundEnabled=true;const b=document.getElementById("soundToggle");b.textContent="🔊 ხმა ჩართულია";b.classList.add("sound-on");b.setAttribute("aria-pressed","true");playAlert();toast("ხმოვანი სიგნალი მუშაობს")}catch(e){toast("ხმა ვერ ჩაირთო — შეამოწმე მოწყობილობის ხმა")}};
 function render(){for(const key of Object.keys(lanes)){const root=document.getElementById("cards-"+key),list=data.filter(o=>o.status===key);root.replaceChildren();document.getElementById("count-"+key).textContent=list.length;if(!list.length)root.append(node("div","empty",lanes[key].empty));else list.forEach(o=>root.append(renderCard(o)))}document.getElementById("summary").textContent="სულ აქტიური შეკვეთები: "+data.length+" · სატესტო რეჟიმი — ცვლილებები მხოლოდ ამ გვერდზე ინახება"}
 function toast(message){const old=document.querySelector(".toast");old?.remove();const t=node("div","toast",message);t.role="status";document.body.append(t);setTimeout(()=>t.remove(),1800)}
-document.getElementById("addOrder").onclick=()=>{const next=1049+data.length;data.unshift({id:"M-"+next,table:((next-1)%8)+1,status:"incoming",time:new Date().toLocaleTimeString("ka-GE",{hour:"2-digit",minute:"2-digit"}),items:[["სატესტო ბურგერი × 1",14],["გამაგრილებელი სასმელი × 1",4]],total:18,note:"ახალი სატესტო შეკვეთა",paid:false});render();toast("ახალი სატესტო შეკვეთა დაემატა")};
+document.getElementById("addOrder").onclick=()=>{const next=1049+data.length;data.unshift({id:"M-"+next,table:((next-1)%8)+1,status:"incoming",time:new Date().toLocaleTimeString("ka-GE",{hour:"2-digit",minute:"2-digit"}),items:[["სატესტო ბურგერი × 1",14],["გამაგრილებელი სასმელი × 1",4]],total:18,note:"ახალი სატესტო შეკვეთა",paid:false});render();playAlert();toast("ახალი სატესტო შეკვეთა დაემატა")};
 render();
 </script>
 </body>
