@@ -187,7 +187,7 @@ async function send(){
     const items=[...cart.values()].map(item=>({...item})),total=Math.round(items.reduce((sum,item)=>sum+item.price*item.quantity,0)*100)/100;
     await addDoc(collection(db,"orders"),{
       restaurantSlug:slug,restaurantName:restaurant.name,customerUid:auth.currentUser.uid,tableNumber:table,tableId:String(table),items,
-      note:$("note").value.trim(),total,status:"new",paymentStatus:"unpaid",createdAt:serverTimestamp()
+      note:$("note").value.trim(),total,status:"new",paymentStatus:"unpaid",...(await window.MENIOSound?.getPushToken?.()?{customerPushToken:await window.MENIOSound.getPushToken()}:{}),createdAt:serverTimestamp()
     });
     cart.clear();$("note").value="";say("შეკვეთა გაიგზავნა!");
   }catch(error){say("შეკვეთა ვერ გაიგზავნა: "+error.message);}
