@@ -28,6 +28,14 @@ test("all published MENIO pages and their main modules exist",()=>{
   }
 });
 
+test("restaurant logo stays in the same restaurant table and returns to categories",()=>{
+  const html=fs.readFileSync(path.join(root,"menu.html"),"utf8");
+  const js=fs.readFileSync(path.join(root,"menu.js"),"utf8");
+  assert.match(html,/<a class="logo menu-brand" href="menu\.html"/);
+  assert.match(js,/restaurantBrand\.href=slug[\s\S]*?table=\$\{table\}/);
+  assert.match(js,/restaurantBrand\.addEventListener\("click",event=>\{[\s\S]*?event\.preventDefault\(\);[\s\S]*?categoryLanding=true;[\s\S]*?selectedCategory="all";[\s\S]*?renderTabs\(\);[\s\S]*?render\(\);/);
+});
+
 test("main landing page uses project-relative routes",()=>{
   const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
   assert.match(html,/<script[^>]+src=["']index-auth\.js/i);

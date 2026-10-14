@@ -4,6 +4,21 @@ const params=new URLSearchParams(location.search),slug=params.get("restaurant"),
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", categoryLanding=true, sending=false, ready=false, ordersUnsubscribe=null;
 let detailId=null;
+// The restaurant logo returns to this table's category landing, never to the public index.
+const restaurantBrand=$("restaurantBrandLogo")?.closest("a.menu-brand");
+if(restaurantBrand){
+  restaurantBrand.href=slug && Number.isSafeInteger(table) && table>0
+    ? `menu.html?restaurant=${encodeURIComponent(slug)}&table=${table}`
+    : "menu.html";
+  restaurantBrand.addEventListener("click",event=>{
+    event.preventDefault();
+    categoryLanding=true;
+    selectedCategory="all";
+    renderTabs();
+    render();
+    window.scrollTo({top:0,behavior:"smooth"});
+  });
+}
 $("cartSummary").onclick=()=>$("orderBox").showModal();
 $("cartClose").onclick=()=>$("orderBox").close();
 $("orderBox").addEventListener("click",event=>{if(event.target===$("orderBox"))$("orderBox").close();});
