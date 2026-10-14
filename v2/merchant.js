@@ -13,12 +13,17 @@ function makeOrderCard(o){
  const head=make("div","order-head"),title=make("h2","", "მაგიდა №"+(o.tableNumber??"—"));
  const statusText=({new:"ახალი შეკვეთა",accepted:"მიღებულია",preparing:"მზადდება",completed:"მზადაა",cancelled:"გაუქმებულია"})[o.status]||o.status||"უცნობი";
  const st=make("span","status status-"+o.status,statusText);head.append(title,st);c.append(head);
+ const stamp=o.createdAt?.toDate?.();
+ const orderMeta=make("div","order-meta");
+ const shortId=make("span","","№ "+String(o.id||"").slice(-6).toUpperCase());
+ const timeLabel=make("span","",stamp?stamp.toLocaleTimeString("ka-GE",{hour:"2-digit",minute:"2-digit"}):"ახლახან");
+ orderMeta.append(shortId,timeLabel);c.append(orderMeta);
  const items=o.items||[];
  if(items.length){items.forEach(i=>{const row=make("div","order-item"),name=make("span","",(i.name||"პროდუქტი")+" × "+(i.quantity??1)),price=make("b","",(Number(i.price||0)*Number(i.quantity||1)).toFixed(2)+" ₾");row.append(name,price);c.append(row)})}
  else c.append(make("p","muted","შეკვეთის პროდუქტები არ არის მითითებული"));
  const total=make("div","order-total"),totalLabel=make("span","","ჯამი"),totalValue=make("strong","",Number(o.total||0).toFixed(2)+" ₾");total.append(totalLabel,totalValue);c.append(total);
  c.append(make("p","order-note",o.note?"შენიშვნა: "+o.note:"შენიშვნა არ არის"));
- c.append(make("div","order-meta","გადახდა: "+(o.paymentStatus==="paid"?"გადახდილია":"მოლოდინში")));
+ const paymentMeta=make("div","order-meta","გადახდა: "+(o.paymentStatus==="paid"?"გადახდილია":"მოლოდინში"));c.append(paymentMeta);
  const actions=make("div","order-actions");
  if(o.status==="new"||o.status==="accepted"){
   const b=make("button","","მომზადების დაწყება");b.onclick=()=>change(o.id,{status:"preparing"},b);actions.append(b);
