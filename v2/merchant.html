@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MENIO Partner — შეკვეთები</title>
-<link rel="stylesheet" href="style.css?v=20261014-merchant-landscape-1">
+<link rel="stylesheet" href="style.css?v=20261014-merchant-apk-sound-1">
 <style>
 .merchant-page{width:min(1600px,96%);margin:22px auto 60px}
 .merchant-title{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:24px 0}
@@ -47,7 +47,7 @@ body{background:#fff!important;overflow:hidden}
 .merchant-page .topbar .logo{font-size:24px;color:#20201c}
 .merchant-page .topbar .live-dot{background:#24a66a;box-shadow:0 0 0 4px #24a66a18}
 .merchant-page .topbar .row>span:nth-child(2){font-size:13px;font-weight:700;color:#65645e}
-.merchant-page .topbar button,.merchant-page .topbar .btn{padding:9px 12px;font-size:12px;border-radius:10px}
+.merchant-page .topbar button,.merchant-page .topbar .btn{padding:9px 12px;font-size:12px;border-radius:10px}\n#soundToggle{white-space:nowrap;background:#fff7f2;border:1px solid #f3d5c7;color:#a94725;font-weight:800}\n#soundToggle.sound-on{background:#eaf8ef;border-color:#c8ebd4;color:#207346}
 .merchant-page .merchant-title{flex:0 0 auto;margin:0;align-items:center;gap:14px}
 .merchant-page .merchant-title .eyebrow{margin:0 0 3px;color:#e75f35;font-size:9px;letter-spacing:1.5px}
 .merchant-page .merchant-title h1{font-size:clamp(22px,2vw,30px);letter-spacing:-.7px;line-height:1.2;margin:0}
@@ -95,12 +95,12 @@ body{background:#fff!important;overflow:hidden}
 <main class="merchant-page">
 <header class="topbar">
 <a class="logo" href="index.html">MENIO<span>.</span></a>
-<div class="row"><span class="live-dot"></span><span>ცოცხალი შეკვეთები</span><button id="logout" class="secondary small-button">გასვლა</button></div>
+<div class="row"><span class="live-dot"></span><span>ცოცხალი შეკვეთები</span><button id="soundToggle" type="button" class="small-button" aria-pressed="false">🔇 ხმის ჩართვა</button><button id="logout" class="secondary small-button">გასვლა</button></div>
 <div class="row"><a id="reportLink" class="btn secondary small-button" href="report.html">ანგარიშგება</a><a id="backToDashboard" class="btn secondary small-button" href="register.html#login">მართვის პანელი</a></div>
 </header>
 <div class="merchant-title">
 <div><p class="eyebrow">MENIO PARTNER · LIVE ORDERS</p><h1>შეკვეთების დაფა</h1><p id="status">შეკვეთებს ველოდები…</p></div>
-<div class="board-summary"><span class="summary-chip">🔔 განახლება ავტომატურად</span></div>
+<div class="board-summary"><span class="summary-chip">🔔 ახალი შეკვეთის ხმოვანი სიგნალი</span></div>
 </div>
 <section id="orders" class="order-board" aria-label="შეკვეთების სტატუსები">
 <div class="order-lane lane-incoming"><div class="lane-head"><div class="lane-title"><span class="lane-dot"></span>შემოსული</div><span class="lane-count">0</span></div><div class="lane-cards"></div></div>
@@ -108,7 +108,7 @@ body{background:#fff!important;overflow:hidden}
 <div class="order-lane lane-ready"><div class="lane-head"><div class="lane-title"><span class="lane-dot"></span>მზადაა</div><span class="lane-count">0</span></div><div class="lane-cards"></div></div>
 </section>
 </main>
-<script type="module" src="merchant.js?v=20261014-merchant-landscape-1"></script>
+<script type="module" src="merchant.js?v=20261014-merchant-apk-sound-1"></script>
 <script type="module">
 const slug=new URLSearchParams(location.search).get("restaurant");
 if(slug){document.getElementById("backToDashboard").href="dashboard.html?restaurant="+encodeURIComponent(slug);document.getElementById("reportLink").href="report.html?restaurant="+encodeURIComponent(slug);}
