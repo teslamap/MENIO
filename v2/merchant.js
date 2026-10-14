@@ -31,8 +31,14 @@ function updateSoundButton(){
 }
 $("soundToggle")?.addEventListener("click",async()=>{
  try{
+  if(window.MenioNative&&typeof window.MenioNative.playOrderAlert==="function"){
+   soundEnabled=true;updateSoundButton();beep();
+   if(alertedOrders.size){stopAlert();alertTimer=setInterval(beep,2400)}
+   showToast("შეკვეთის ხმოვანი სიგნალი ჩართულია","success");return;
+  }
   audioContext=audioContext||new (window.AudioContext||window.webkitAudioContext)();
   await audioContext.resume();soundEnabled=true;updateSoundButton();beep();
+  if(alertedOrders.size){stopAlert();alertTimer=setInterval(beep,2400)}
   showToast("შეკვეთის ხმოვანი სიგნალი ჩართულია","success");
  }catch(e){showToast("ხმის ჩართვა ვერ მოხერხდა — შეამოწმე მოწყობილობის ხმა","error")}
 });
