@@ -4,6 +4,7 @@ import {
 } from "./firebase.js";
 import { requireOwner } from "./app.js";
 import { safeProductImage as safeImage, encodeProductPhoto } from "./image-utils.js?v=20261013-photo-upload-1";
+import { confirmDialog, promptDialog } from "./ui.js?v=20261014-ui-1";
 
 const $ = id => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get("restaurant");
@@ -244,7 +245,7 @@ function renderProducts() {
       action(product.active === false ? "გამოჩენა" : "დამალვა", () =>
         updateDoc(doc(menuRef, product.id), { active: product.active === false, updatedAt: serverTimestamp() })),
       action("წაშლა", async () => {
-        if (!confirm("წაიშალოს „" + product.name + "“?")) return;
+        if (!(await confirmDialog("წაიშალოს „" + product.name + "“?", {title:"პროდუქტის წაშლა",danger:true,confirmText:"წაშლა"}))) return;
         await deleteDoc(doc(menuRef, product.id));
         if ($("dishId").value === product.id) resetProduct();
         say("პროდუქტი წაიშალა.");
@@ -283,7 +284,7 @@ function renderCategories() {
       $("categoryName").focus();
     }), action("წაშლა", async () => {
       if (count) throw Error("ჯერ გადაიტანე ამ კატეგორიის პროდუქტები სხვა კატეგორიაში.");
-      if (!confirm("წაიშალოს კატეგორია „" + category.name + "“?")) return;
+      if (!(await confirmDialog("წაიშალოს კატეგორია „" + category.name + "“?", {title:"კატეგორიის წაშლა",danger:true,confirmText:"წაშლა"}))) return;
       await deleteDoc(doc(categoryRef, category.id));
       if ($("categoryId").value === category.id) resetCategory();
       say("კატეგორია წაიშალა.");
@@ -324,7 +325,7 @@ function renderTables() {
     const actions = element("div", undefined, "actions compact");
     actions.append(action("ბმულის კოპირება", async () => {
       try { await navigator.clipboard.writeText(url.href); say("ბმული კოპირებულია."); }
-      catch { prompt("დააკოპირე მაგიდის ბმული:", url.href); }
+      catch { await promptDialog("ბმული მზადაა დასაკოპირებლად:", url.href); }
     }));
     if (data) {
       const download = element("a", "QR ჩამოტვირთვა", "btn secondary small-button");
@@ -332,7 +333,7 @@ function renderTables() {
       actions.append(download);
     }
     actions.append(action("მაგიდის წაშლა", async () => {
-      if (!confirm("წაიშალოს მაგიდა №" + table.number + "? მისი QR კოდი აღარ იმუშავებს. არსებული შეკვეთები შენარჩუნდება.")) return;
+      if (!(await confirmDialog("წაიშალოს მაგიდა №" + table.number + "? მისი QR კოდი აღარ იმუშავებს. არსებული შეკვეთები შენარჩუნდება.", {title:"მაგიდის წაშლა",danger:true,confirmText:"წაშლა"}))) return;
       await runTransaction(db, async tx => {
         const restaurantRef = doc(db,"restaurants",slug), tableDoc = doc(tableRef,table.id);
         const restaurant = await tx.get(restaurantRef), current = await tx.get(tableDoc);
@@ -386,7 +387,7 @@ $("importMenuSubmit").onclick = async () => {
   const button = $("importMenuSubmit");
   if (!productsLoaded || !categoriesLoaded) { say("რესტორნის მენიუ იტვირთება. სცადე რამდენიმე წამში."); return; }
   if (!pendingMenuImport.length) return;
-  const proceed = confirm(`დაემატოს ${pendingMenuImport.length} კერძი ფოტოების გარეშე? უკვე არსებული კერძები გამოტოვდება.`);
+  const proceed = await confirmDialog(`დაემატოს ${pendingMenuImport.length} კერძი ფოტოების გარეშე? უკვე არსებული კერძები გამოტოვდება.`, {title:"მენიუს იმპორტი",confirmText:"დამატება"});
   if (!proceed) return;
   button.disabled = true;
   try {
