@@ -42,11 +42,15 @@ async function activateSound(){
   playChime();
   if("Notification" in window&&Notification.permission==="default"){try{await Notification.requestPermission();}catch{}}
   await setupPush();
-  setStatus(pushToken?"შეკვეთის ხმა და Push ჩართულია ✓":"შეკვეთის ხმა ჩართულია ✓");resolveEnable(true);
+  if(!pushToken){
+   setStatus("Push ვერ ჩაირთო. შეკვეთის გასაგზავნად დაუშვი ბრაუზერის შეტყობინებები და სცადე ხელახლა.");
+   resolveEnable(false);return;
+  }
+  setStatus("შეკვეთის ხმა და Push ჩართულია ✓");resolveEnable(true);
  }catch(e){setStatus("ხმის ჩართვა ვერ მოხერხდა. სცადე ხელახლა.");resolveEnable(false);}
 }
 function ensureEnabled(){
- if(soundEnabled&&audioContext?.state==="running")return Promise.resolve(true);
+ if(soundEnabled&&audioContext?.state==="running"&&pushToken)return Promise.resolve(true);
  ensurePermissionPrompt();
  // Every checkout attempt must be able to reopen the prompt after a previous cancellation/failure.
  return new Promise(resolve=>{
