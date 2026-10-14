@@ -1,8 +1,40 @@
-import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAnonymously,onAuthStateChanged} from "./firebase.js";
+import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAnonymously,onAuthStateChanged,query,where} from "./firebase.js";
 import { safeProductImage } from "./image-utils.js";
 const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table"));
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
-let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false;
+let restaurant, dishes=[], selectedCategory="all", categoryLanding=true, sending=false, ready=false, ordersUnsubscribe=null;
+let detailId=null;
+$("cartSummary").onclick=()=>$("orderBox").showModal();
+$("cartClose").onclick=()=>$("orderBox").close();
+$("orderBox").addEventListener("click",event=>{if(event.target===$("orderBox"))$("orderBox").close();});
+function addDish(dish){
+  if(sending || !ready)return;
+  const old=cart.get(dish.id);
+  cart.set(dish.id,{dishId:dish.id,name:dish.name,price:Number(dish.price),quantity:(old?.quantity || 0)+1});
+  drawCart();
+}
+function openProduct(dish){
+  detailId=dish.id;
+  $("productName").textContent=dish.name;
+  $("productCategory").textContent=groupName(dish);
+  $("productDescription").textContent=dish.description || "ამ პროდუქტს დამატებითი აღწერა ჯერ არ აქვს.";
+  $("productPrice").textContent=money(dish.price);
+  const photo=safeProductImage(dish.imageUrl);
+  $("productPhoto").hidden=!photo;
+  $("productPhoto").src=photo || "";
+  $("productPhoto").alt=dish.name;
+  $("productPhoto").onerror=()=>$("productPhoto").hidden=true;
+  $("productAdd").disabled=sending || !ready;
+  $("productAdd").textContent="შეკვეთაში დამატება +";
+  if(!$("productDialog").open)$("productDialog").showModal();
+}
+$("productClose").onclick=()=>$("productDialog").close();
+$("productDialog").addEventListener("click",event=>{if(event.target===$("productDialog"))$("productDialog").close();});
+$("productDialog").addEventListener("close",()=>{detailId=null;});
+$("productAdd").onclick=()=>{
+  const dish=dishes.find(d=>d.id===detailId);
+  if(dish && !sending && ready){addDish(dish);$("productAdd").textContent="დამატებულია ✓ · კიდევ დამატება +";}
+};
 const DEFAULT_THEME_COLOR="#f97316";
 function applyMenuTheme(color){
   const hex=color.slice(1), red=parseInt(hex.slice(0,2),16), green=parseInt(hex.slice(2,4),16), blue=parseInt(hex.slice(4,6),16);
@@ -12,23 +44,58 @@ function applyMenuTheme(color){
   document.documentElement?.style?.setProperty?.("--menu-foreground-color",luminance>.42?"#171920":"#f5f5f7");
 }
 const money=n=>Number(n).toFixed(2)+" ₾";
-const say=text=>{ $("message").textContent=text; };
+const say=text=>{ $("message").textContent=text;$("menuStatus").textContent=text; };
 const el=(tag,text,className)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;};
 function groupId(dish){return dish.categoryId ? "id:"+dish.categoryId : dish.category ? "legacy:"+dish.category : "none";}
 function groupName(dish){return categories.get(dish.categoryId)?.name || dish.category || "სხვა";}
+const CATEGORY_ORDER=["ბურგერი","ქათმის ხორცი","საქონლის ხორცი","ღორის ხორცი","კრევეტები","ზღვის პროდუქტები","ვეგეტარიანული","ხაჭაპური","პიცა","პასტა","სუში","სალათი","წვნიანები","წვნინანები","სენდვიჩი","სნექი","გამაგრილებელი სასმელი","იაპონური ლიმონათი","ყავა","ლუდი","საკე","კორეული არაყი","ვისკი","დანამატი"];
+const normalizeCategory=value=>String(value||"").trim().toLocaleLowerCase("ka").replace(/\s+/g," ");
 function renderTabs(){
-  const groups=new Map(dishes.map(dish=>[groupId(dish),groupName(dish)]));
-  if(selectedCategory!=="all" && !groups.has(selectedCategory)) selectedCategory="all";
-  $("categoryTabs").replaceChildren();
-  for(const [id,name] of new Map([["all","ყველა"],...groups])){
-    const button=el("button",name,"secondary small-button");
-    button.setAttribute("aria-pressed",String(id===selectedCategory));
-    button.onclick=()=>{selectedCategory=id;renderTabs();render();};
-    $("categoryTabs").append(button);
+  const nav=$("categoryTabs");nav.replaceChildren();
+  if(categoryLanding){nav.hidden=true;return;}
+  nav.hidden=false;
+  const back=el("button","← ყველა კატეგორია","secondary small-button category-back");
+  back.onclick=()=>{categoryLanding=true;selectedCategory="all";renderTabs();render();};
+  nav.append(back);
+}
+function categoryEntries(){
+  const entries=new Map();
+  for(const [id,data] of categories){
+    const name=String(data.name||data.title||"").trim();
+    if(name)entries.set("id:"+id,{id:"id:"+id,name});
   }
+  for(const dish of dishes){
+    const id=groupId(dish),name=groupName(dish);
+    if(!entries.has(id))entries.set(id,{id,name});
+  }
+  const priority=name=>{const n=normalizeCategory(name);let i=CATEGORY_ORDER.findIndex(x=>normalizeCategory(x)===n);if(i<0&&n==="წვნიანები")i=CATEGORY_ORDER.indexOf("წვნინანები");return i<0?999:i;};
+  return [...entries.values()].sort((a,b)=>priority(a.name)-priority(b.name)||a.name.localeCompare(b.name,"ka"));
+}
+function renderCategoryLanding(){
+  const menu=$("menu");menu.replaceChildren();
+  const heading=el("h2","აირჩიე კატეგორია","category-landing-title");
+  menu.append(heading);
+  const grid=el("div",undefined,"category-square-grid");
+  for(const category of categoryEntries()){
+    const product=dishes.find(d=>groupId(d)===category.id&&safeProductImage(d.imageUrl));
+    const tile=el("button",undefined,"category-square");
+    tile.type="button";
+    if(product){
+      const photo=el("img",undefined,"category-square-photo");
+      photo.src=safeProductImage(product.imageUrl);photo.alt="";photo.loading="lazy";
+      photo.onerror=()=>{photo.remove();tile.classList.add("category-square-no-photo");};
+      tile.append(photo);
+    }else tile.classList.add("category-square-no-photo");
+    tile.append(el("span",category.name,"category-square-name"));
+    tile.onclick=()=>{selectedCategory=category.id;categoryLanding=false;renderTabs();render();};
+    grid.append(tile);
+  }
+  menu.append(grid);
+  if(!grid.children.length)menu.append(el("p","კატეგორიები ჯერ არ არის დამატებული.","muted"));
 }
 function render(){
   $("menu").replaceChildren();
+  if(categoryLanding){renderCategoryLanding();return;}
   const visible=dishes.filter(dish=>selectedCategory==="all" || groupId(dish)===selectedCategory);
   if(!visible.length){$("menu").textContent="მენიუ ჯერ არ არის დამატებული";return;}
   const groups=new Map();
@@ -45,17 +112,18 @@ function render(){
       const card=el("article",undefined,"dish-card");
       const photo = safeProductImage(dish.imageUrl);
       if(photo){
-        const image=el("img",undefined,"dish-photo"),fallback=el("div","ფოტოს ჩატვირთვა ვერ მოხერხდა","dish-photo-placeholder");
-        fallback.hidden=true;image.src=photo;image.alt=dish.name;image.loading="lazy";
-        image.onerror=()=>{image.hidden=true;fallback.hidden=false;};card.append(image,fallback);
+        const image=el("img",undefined,"dish-photo");image.src=photo;image.alt=dish.name;image.loading="lazy";
+        image.onerror=()=>image.hidden=true;card.append(image);
       }
-      card.append(el("h3",dish.name),el("p",dish.description || ""));
+      const title=el("h3"),details=el("button",dish.name,"dish-details");
+      details.setAttribute("aria-haspopup","dialog");details.setAttribute("aria-label",dish.name+" — დეტალურად ნახვა");
+      details.onclick=()=>openProduct(dish);title.append(details);
+      card.onclick=event=>{if(!event.target.closest?.("button"))openProduct(dish);};
+      card.append(title,el("p",dish.description || "აღწერის სანახავად გახსენი პროდუქტი"));
       const row=el("div",undefined,"row"),button=el("button","დამატება +");
       button.disabled=sending;
       button.onclick=()=>{
-        const old=cart.get(dish.id);
-        cart.set(dish.id,{dishId:dish.id,name:dish.name,price:Number(dish.price),quantity:(old?.quantity || 0)+1});
-        drawCart();
+        addDish(dish);
       };
       row.append(el("b",money(dish.price)),button);card.append(row);grid.append(card);
     }
@@ -76,6 +144,10 @@ function drawCart(){
   $("total").textContent=money(total);$("cartItemCount").textContent=count;$("cartSummaryTotal").textContent=money(total);$("sendOrder").disabled=!ready || sending || !cart.size;
 }
 function reconcileCart(){
+  if(detailId){
+    const current=dishes.find(d=>d.id===detailId);
+    if(current)openProduct(current);else $("productDialog").close();
+  }
   let changed=false;
   for(const [id,item] of cart){
     const dish=dishes.find(d=>d.id===id);
@@ -88,14 +160,48 @@ function reconcileCart(){
   drawCart();
 }
 const authReady=new Promise(resolve=>{const stop=onAuthStateChanged(auth,()=>{stop();resolve();});});
+const orderStatuses={new:"მიღებულია",accepted:"მიღებულია",preparing:"მზადდება",completed:"მზადაა",cancelled:"გაუქმებულია"};
+function renderCustomerOrders(snapshot){
+  const root=$("myOrdersList");root.replaceChildren();
+  const orders=snapshot.docs.map(d=>({...d.data(),id:d.id})).filter(o=>o.restaurantSlug===slug).sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+  if(!orders.length){root.append(el("div","ჯერ შეკვეთა არ გაგიფორმებია.","orders-empty"));return;}
+  for(const order of orders){
+    const card=el("article",undefined,"customer-order-card");
+    const head=el("div",undefined,"customer-order-head");
+    head.append(el("strong","შეკვეთა № "+order.id.slice(-6).toUpperCase()),el("span",orderStatuses[order.status]||order.status||"სტატუსი უცნობია","customer-order-status status-"+(order.status||"new")));
+    card.append(head);
+    card.append(el("p",(order.items||[]).map(i=>(i.name||"პროდუქტი")+" × "+(i.quantity||1)).join(" · "),"customer-order-items"));
+    const meta=el("div",undefined,"customer-order-meta");
+    meta.append(el("span","მაგიდა №"+(order.tableNumber||table)),el("strong",money(order.total||0)));
+    card.append(meta);
+    if(order.note)card.append(el("p","შენიშვნა: "+order.note,"customer-order-note"));
+    if(order.status==="completed")card.append(el("p","შენი შეკვეთა მზადაა! შეგიძლია აიღო.","customer-order-ready"));
+    if(order.status==="cancelled")card.append(el("p","ეს შეკვეთა გაუქმებულია.","customer-order-note"));
+    root.append(card);
+  }
+}
+function listenCustomerOrders(){
+  if(!auth.currentUser)return;
+  ordersUnsubscribe?.();
+  const q=query(collection(db,"orders"),where("customerUid","==",auth.currentUser.uid));
+  ordersUnsubscribe=onSnapshot(q,renderCustomerOrders,error=>{
+    $("myOrdersList").replaceChildren(el("p","შეკვეთების ჩატვირთვა ვერ მოხერხდა. განაახლე გვერდი და სცადე ხელახლა.","orders-error"));
+  });
+}
+$("myOrdersButton").onclick=()=>{if(!$("myOrdersDialog").open)$("myOrdersDialog").showModal();};
+$("myOrdersClose").onclick=()=>$("myOrdersDialog").close();
+$("myOrdersDialog").addEventListener("click",event=>{if(event.target===$("myOrdersDialog"))$("myOrdersDialog").close();});
 async function init(){
   if(!slug || !Number.isSafeInteger(table) || table<1)throw Error("QR ბმული არასწორია");
+  await authReady;
+  if(!auth.currentUser)await signInAnonymously(auth);
+  listenCustomerOrders();
   const [rs,ts]=await Promise.all([getDoc(doc(db,"restaurants",slug)),getDoc(doc(db,"restaurants",slug,"tables",String(table)))]);
   if(!rs.exists() || !rs.data().active || !ts.exists() || !ts.data().active)throw Error("რესტორანი ან მაგიდა მიუწვდომელია");
-  restaurant=rs.data();$("restaurantName").textContent=restaurant.name;
+  restaurant=rs.data();$("restaurantName").textContent=restaurant.name;const brandImage=document.getElementById("restaurantBrandLogo");if(brandImage){if(typeof restaurant.restaurantLogo==="string"&&restaurant.restaurantLogo.startsWith("data:image/jpeg;base64,")){brandImage.src=restaurant.restaurantLogo;brandImage.hidden=false;}else{brandImage.hidden=true;brandImage.removeAttribute("src");}}
   const themeColor=typeof restaurant.themeColor==="string" && /^#[0-9a-f]{6}$/i.test(restaurant.themeColor) ? restaurant.themeColor : DEFAULT_THEME_COLOR;
   applyMenuTheme(themeColor);
-  $("tableInfo").textContent="მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
+  const tableInfo=$("tableInfo");if(tableInfo)tableInfo.textContent="მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
   unsubscribers.push(onSnapshot(collection(db,"restaurants",slug,"categories"),snapshot=>{
     categories.clear();snapshot.forEach(d=>categories.set(d.id,d.data()));renderTabs();render();
   },error=>say("კატეგორიების ჩატვირთვა ვერ მოხერხდა: "+error.message)));
@@ -107,19 +213,20 @@ async function init(){
 }
 async function send(){
   if(sending || !ready || !cart.size)return;
+  // Sound and Push are optional: they must never block placing an order.
   sending=true;render();drawCart();
   try{
     await authReady;
     if(!auth.currentUser)await signInAnonymously(auth);
     const items=[...cart.values()].map(item=>({...item})),total=Math.round(items.reduce((sum,item)=>sum+item.price*item.quantity,0)*100)/100;
     await addDoc(collection(db,"orders"),{
-      restaurantSlug:slug,restaurantName:restaurant.name,tableNumber:table,tableId:String(table),items,
-      note:$("note").value.trim(),total,status:"new",paymentStatus:"unpaid",createdAt:serverTimestamp()
+      restaurantSlug:slug,restaurantName:restaurant.name,customerUid:auth.currentUser.uid,tableNumber:table,tableId:String(table),items,
+      note:$("note").value.trim(),total,status:"new",paymentStatus:"unpaid",...(await window.MENIOSound?.getPushToken?.()?{customerPushToken:await window.MENIOSound.getPushToken()}:{}),createdAt:serverTimestamp()
     });
     cart.clear();$("note").value="";say("შეკვეთა გაიგზავნა!");
   }catch(error){say("შეკვეთა ვერ გაიგზავნა: "+error.message);}
   finally{sending=false;render();drawCart();}
 }
-window.addEventListener("pagehide",()=>unsubscribers.forEach(stop=>stop()));
+window.addEventListener("pagehide",()=>{unsubscribers.forEach(stop=>stop());ordersUnsubscribe?.();});
 init().catch(error=>{ready=false;drawCart();say(error.message);$("restaurantName").textContent="მენიუ მიუწვდომელია";});
 

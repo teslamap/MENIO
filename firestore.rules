@@ -105,7 +105,6 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.keys().hasAll(['restaurantSlug', 'tableNumber', 'tableId', 'items', 'total', 'status', 'paymentStatus', 'createdAt'])
         && request.resource.data.restaurantSlug is string
-        && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.tableNumber is int
         && request.resource.data.tableId is string
         && request.resource.data.tableId == string(request.resource.data.tableNumber)

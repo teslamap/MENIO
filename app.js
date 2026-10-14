@@ -77,17 +77,26 @@ if($("loginForm")) $("loginForm").addEventListener("submit",async event=>{
     if(owners.empty) {
       $("email").value=credential.user.email || "";
       $("password").value=$("loginPassword").value;
-      msg("ანგარიშში შესული ხარ. რესტორნის შესაქმნელად შეავსე ფორმა ზემოთ.");
-      $("registerForm").scrollIntoView({behavior:"smooth"}); $("restaurantName").focus();
+      msg("ანგარიში არსებობს, მაგრამ რესტორანი ჯერ არ არის შექმნილი. დაასრულე რეგისტრაცია.");
+      const dialog=$("registerDialog");
+      if(dialog && !dialog.open) dialog.showModal();
+      $("restaurantName").focus();
       return;
     }
-    if(owners.size===1) location.href="dashboard.html?restaurant="+encodeURIComponent(owners.docs[0].id);
-    else {
+    const returnTo=new URLSearchParams(location.search).get("returnTo");
+    const requestedRestaurant=new URLSearchParams(location.search).get("restaurant");
+    const merchantReturn=returnTo==="merchant";
+    if(owners.size===1) {
+      const ownerSlug=owners.docs[0].id;
+      location.href=merchantReturn
+        ? "merchant.html?restaurant="+encodeURIComponent(owners.docs.some(item=>item.id===requestedRestaurant)?requestedRestaurant:ownerSlug)
+        : "dashboard.html?restaurant="+encodeURIComponent(ownerSlug);
+    } else {
       const list=$("restaurantChoices"); list.replaceChildren();
       for(const owner of owners.docs) {
         const restaurant=await getDoc(doc(db,"restaurants",owner.id));
         const link=document.createElement("a"); link.className="btn secondary";
-        link.href="dashboard.html?restaurant="+encodeURIComponent(owner.id);
+        link.href=(merchantReturn?"merchant.html":"dashboard.html")+"?restaurant="+encodeURIComponent(owner.id);
         link.textContent=restaurant.exists() ? restaurant.data().name : owner.id;
         list.append(link);
       }
@@ -109,3 +118,4 @@ export function listenOrders(slug,callback,error=console.error) {
     snapshot=>callback(snapshot.docs.map(record=>({...record.data(),id:record.id}))),error);
 }
 export {auth,db,signOut,doc,getDoc,collection,serverTimestamp};
+

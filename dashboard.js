@@ -3,14 +3,14 @@ import {
   onSnapshot, runTransaction, serverTimestamp, onAuthStateChanged, signOut
 } from "./firebase.js";
 import { requireOwner } from "./app.js";
-import { safeProductImage as safeImage, encodeProductPhoto } from "./image-utils.js?v=20261013-photo-upload-1";
+import { safeProductImage as safeImage, encodeProductPhoto } from "./image-utils.js";
 import { confirmDialog, promptDialog } from "./ui.js?v=20261014-ui-1";
 
 const $ = id => document.getElementById(id);
 const slug = new URLSearchParams(location.search).get("restaurant");
 const products = new Map(), categories = new Map(), tables = new Map();
 const unsubscribers = [];
-let imageObjectURL, stopped = false, productsLoaded = false, categoriesLoaded = false, pendingMenuImport = [];
+let imageObjectURL, stopped = false, productsLoaded = false, categoriesLoaded = false, pendingMenuImport = [], restaurantLogoPreviewUrl;
 const DEFAULT_THEME_COLOR = "#f97316";
 const MENU_IMPORT_CATEGORIES = new Set(["ბურგერი","ქათმის ხორცი","საქონლის ხორცი","ღორის ხორცი","კრევეტები","ზღვის პროდუქტები","ვეგეტარიანული","ხაჭაპური","პიცა","პასტა","სუში","სალათი","წვნინანები","სენდვიჩი","სნექი","გამაგრილებელი სასმელი","იაპონური ლიმონათი","ყავა","ლუდი","საკე","კორეული არაყი","ვისკი","დანამატი"]);
 function parseMenuImport(text) {
@@ -35,123 +35,8 @@ function parseMenuImport(text) {
   return products;
 }
 const say = message => { $("businessMessage").textContent = message; };
-function setPhotoProgress(kind, value, label, state = "working") {
-  const progress = $(`${kind}PhotoProgress`), text = $(`${kind}PhotoProgressLabel`), percent = $(`${kind}PhotoProgressValue`);
-  $(`${kind}PhotoProgressWrap`).hidden = false;
-  progress.value = Math.max(0, Math.min(100, Math.round(value)));
-  progress.dataset.state = state;
-  text.textContent = label;
-  percent.textContent = `${progress.value}%`;
-}
-function resetPhotoProgress(kind) {
-  const wrap = $(`${kind}PhotoProgressWrap`);
-  if (!wrap) return;
-  wrap.hidden = true;
-  $(`${kind}PhotoProgress`).value = 0;
-  $(`${kind}PhotoProgress`).dataset.state = "working";
-  $(`${kind}PhotoProgressLabel`).textContent = "";
-  $(`${kind}PhotoProgressValue`).textContent = "0%";
-}
-let photoPairs = [], savingPhotos = false;
-function updateBulkPhotoMappingState() {
-  const assigned = photoPairs.filter(pair => pair.id);
-  const unique = new Set(assigned.map(pair => pair.id)).size === assigned.length;
-  $("saveBulkPhotos").disabled = savingPhotos || !assigned.length || !unique;
-  if (!unique) $("bulkPhotoHint").textContent = "ერთი პროდუქტი მხოლოდ ერთ ფოტოს მიაბი.";
-  else if (photoPairs.length && assigned.length < photoPairs.length)
-    $("bulkPhotoHint").textContent = `მიბმულია ${assigned.length} / ${photoPairs.length} ფოტო. შეურჩეული ფოტოები გამოტოვდება.`;
-  else if (assigned.length)
-    $("bulkPhotoHint").textContent = `${assigned.length} ფოტო მზადაა შესანახად.`;
-}
-$("bulkPhotoFiles").onchange = () => {
-  photoPairs = [];
-  $("bulkPhotoPreview").replaceChildren();
-  resetPhotoProgress("bulk");
-  $("bulkPhotoHint").textContent = "";
-  $("saveBulkPhotos").disabled = true;
-  const files = [...$("bulkPhotoFiles").files].filter(file => /\.(jpe?g|png|webp)$/i.test(file.name))
-    .sort((a,b) => a.name.localeCompare(b.name, "en", { numeric:true })).reverse();
-  const ordered = [...products.values()].sort((a,b) => a.name.localeCompare(b.name, "ka"));
-  if (!productsLoaded || !ordered.length) {
-    const message = "ჯერ დაელოდე პროდუქტების ჩატვირთვას.";
-    $("bulkPhotoHint").textContent = message; say(message); return;
-  }
-  if (!files.length) {
-    const message = "საქაღალდეში JPEG, PNG ან WebP ფოტოები ვერ ვიპოვე.";
-    $("bulkPhotoHint").textContent = message; say(message); return;
-  }
-  if (files.length === ordered.length) {
-    photoPairs = ordered.map((product,index) => ({ id:product.id, name:product.name, file:files[index] }));
-    for (const pair of photoPairs) $("bulkPhotoPreview").append(element("p", `${pair.name} ← ${pair.file.name}`));
-    $("saveBulkPhotos").disabled = false;
-    $("bulkPhotoHint").textContent = `${files.length} ფოტო ავტომატურად მიება პროდუქტებს. გადაამოწმე და შეინახე.`;
-    say(`${files.length} ფოტო მზადაა. გადაამოწმე შესაბამისობა და შეინახე.`);
-    return;
-  }
-  photoPairs = files.map(file => ({ id:"", name:"", file }));
-  for (const pair of photoPairs) {
-    const row = element("div", undefined, "photo-map-row");
-    const select = document.createElement("select");
-    select.setAttribute("aria-label", `${pair.file.name} — პროდუქტის არჩევა`);
-    select.add(new Option("აირჩიე პროდუქტი", ""));
-    for (const product of ordered) select.add(new Option(product.name, product.id));
-    select.onchange = () => {
-      pair.id = select.value;
-      pair.name = products.get(pair.id)?.name || "";
-      updateBulkPhotoMappingState();
-    };
-    row.append(element("span", pair.file.name, "muted"), select);
-    $("bulkPhotoPreview").append(row);
-  }
-  $("bulkPhotoHint").textContent = `ფოტოებია ${files.length}, პროდუქტია ${ordered.length}. მიუთითე თითოეული ფოტოს კერძი. გამოტოვებული ფოტოები არ შეინახება.`;
-  say("რაოდენობები განსხვავდება. ფოტოები პროდუქტებს ხელით მიაბი.");
-};
-$("saveBulkPhotos").onclick = async () => {
-  if (savingPhotos) { say("ფოტოების შენახვა უკვე მიმდინარეობს."); return; }
-  if (stopped) { say("სესია დასრულდა. განაახლე გვერდი და სცადე თავიდან."); return; }
-  const selectedPairs = photoPairs.filter(pair => pair.id);
-  if (!selectedPairs.length) {
-    say("ფოტოები დასამუშავებლად მზად არ არის. ხელახლა აირჩიე საქაღალდე და გადაამოწმე რაოდენობა.");
-    return;
-  }
-  if (new Set(selectedPairs.map(pair => pair.id)).size !== selectedPairs.length) {
-    say("ერთი პროდუქტი მხოლოდ ერთ ფოტოს მიაბი.");
-    return;
-  }
-  savingPhotos = true;
-  $("saveBulkPhotos").disabled = true;
-  $("saveBulkPhotos").textContent = "ინახება…";
-  $("bulkPhotoFiles").disabled = true;
-  let saved = 0;
-  try {
-    const total = selectedPairs.length;
-    for (const [index, pair] of selectedPairs.entries()) {
-      if (!products.has(pair.id) || products.get(pair.id).name !== pair.name) throw Error("პროდუქტები შეიცვალა. ფოტოები თავიდან აირჩიე.");
-      if (stopped) throw Error("სესია დასრულდა.");
-      setPhotoProgress("bulk", saved / total * 100, `ვამზადებ ფოტოს ${index + 1} / ${total} · ${pair.name}`);
-      const imageUrl = await encodeProductPhoto(pair.file);
-      await updateDoc(doc(menuRef,pair.id), { imageUrl, imagePath:"", updatedAt:serverTimestamp() });
-      saved++;
-      setPhotoProgress("bulk", saved / total * 100, `შენახულია ${saved} / ${total} · შემდეგი: ${selectedPairs[index + 1]?.name || "დასრულება"}`, saved === total ? "complete" : "working");
-      say(`ინახება ფოტოები: ${saved} / ${total}`);
-    }
-    photoPairs = [];
-    $("bulkPhotoFiles").value = "";
-    $("bulkPhotoPreview").replaceChildren();
-    setPhotoProgress("bulk", 100, `შენახულია ${saved} / ${saved} ფოტო`, "complete");
-    $("bulkPhotoHint").textContent = `${saved} ფოტო შენახულია.`;
-    say(`შენახულია ${saved} ფოტო.`);
-  } catch (error) {
-    const progress = $("bulkPhotoProgress");
-    setPhotoProgress("bulk", progress.value, `ატვირთვა შეჩერდა: ${error.message}`, "error");
-    say(`შენახულია ${saved} ფოტო. ${error.message}`);
-  } finally {
-    savingPhotos = false;
-    $("bulkPhotoFiles").disabled = false;
-    $("saveBulkPhotos").textContent = "ფოტოების შენახვა";
-    updateBulkPhotoMappingState();
-  }
-};
+ const showLogoStatus = (title, message, success=false) => { $("logoStatusTitle").textContent=title; $("logoStatusMessage").textContent=message; $("logoStatusMessage").className=success?"logo-status-success":"logo-status-error"; const dialog=$("logoStatusDialog"); if(!dialog.open) dialog.showModal(); };
+ $("closeLogoStatus").onclick=()=> $("logoStatusDialog").close(); $("confirmLogoStatus").onclick=()=> $("logoStatusDialog").close(); $("logoStatusDialog").addEventListener("click",event=>{if(event.target===$("logoStatusDialog")) $("logoStatusDialog").close();});
 function renderTheme(color = DEFAULT_THEME_COLOR) {
   const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_THEME_COLOR;
   const hex=safeColor.slice(1), channels=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16));
@@ -159,7 +44,7 @@ function renderTheme(color = DEFAULT_THEME_COLOR) {
   const luminance=.2126*linear(channels[0])+.7152*linear(channels[1])+.0722*linear(channels[2]);
   $("themeColor").value = safeColor;
   $("themeColorValue").textContent = safeColor.toUpperCase();
-  $("themePreview").style?.setProperty?.("--accent-color", "#d7ff64");
+  $("themePreview").style?.setProperty?.("--accent-color", "#ed683d");
   $("themePreview").style?.setProperty?.("--menu-background-color", safeColor);
   $("themePreview").style?.setProperty?.("--menu-foreground-color", luminance>.42?"#171920":"#f5f5f7");
 }
@@ -191,7 +76,6 @@ function listen(reference, target, render, markLoaded = () => {}) {
 }
 function resetProduct() {
   $("dishForm").reset();
-  resetPhotoProgress("dish");
   $("dishId").value = "";
   if (imageObjectURL) URL.revokeObjectURL(imageObjectURL);
   imageObjectURL = undefined;
@@ -230,11 +114,9 @@ function renderProducts() {
     const url = safeImage(product.imageUrl);
     if (url) {
       const img = element("img", undefined, "dish-photo");
-      const fallback = element("div", "ფოტოს ჩატვირთვა ვერ მოხერხდა", "dish-photo-placeholder");
-      fallback.hidden = true;
       img.src = url; img.alt = product.name; img.loading = "lazy";
-      img.onerror = () => { img.hidden = true; fallback.hidden = false; };
-      card.append(img, fallback);
+      img.onerror = () => img.hidden = true;
+      card.append(img);
     }
     card.append(element("span", categories.get(product.categoryId)?.name || product.category || "კატეგორიის გარეშე", "muted"),
       element("h3", product.name), element("p", product.description || ""),
@@ -347,7 +229,6 @@ function renderTables() {
   }
 }
 $("dishImage").onchange = () => {
-  resetPhotoProgress("dish");
   if (imageObjectURL) URL.revokeObjectURL(imageObjectURL);
   const file = $("dishImage").files[0];
   if (!file) { $("imagePreview").hidden=true; return; }
@@ -360,6 +241,9 @@ $("dishImage").onchange = () => {
 $("cancelEdit").onclick = resetProduct;
 $("cancelCategory").onclick = resetCategory;
 $("productFilter").onchange = renderProducts;
+$("brandNavLink").onclick = event => { event.preventDefault(); $("brandDialog").showModal(); };
+$("closeBrandDialog").onclick = () => $("brandDialog").close();
+$("brandDialog").addEventListener("click", event => { if (event.target === $("brandDialog")) $("brandDialog").close(); });
 $("appearanceNavLink").onclick = event => { event.preventDefault(); $("appearanceDialog").showModal(); };
 $("closeAppearanceDialog").onclick = () => $("appearanceDialog").close();
 $("tablesNavLink").onclick = event => { event.preventDefault(); $("tableDialog").showModal(); };
@@ -438,6 +322,17 @@ $("importMenuSubmit").onclick = async () => {
   } catch(error) { say("იმპორტი ვერ დასრულდა: " + error.message); }
   finally { button.disabled = !pendingMenuImport.length; }
 };
+$("restaurantLogoFile").onchange=()=>{const file=$("restaurantLogoFile").files[0],preview=$("restaurantLogoPreview");if(restaurantLogoPreviewUrl)URL.revokeObjectURL(restaurantLogoPreviewUrl);restaurantLogoPreviewUrl="";if(!file){preview.hidden=true;preview.removeAttribute("src");$("logoPreviewPlaceholder").hidden=false;$("logoFileName").textContent="PNG, JPG ან WebP · მაქს. 5 MB";return;}if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>5*1024*1024){$("restaurantLogoFile").value="";$("logoFileName").textContent="PNG, JPG ან WebP · მაქს. 5 MB";say("ლოგო უნდა იყოს JPEG, PNG ან WebP და მაქსიმუმ 5 MB.");return;}restaurantLogoPreviewUrl=URL.createObjectURL(file);preview.src=restaurantLogoPreviewUrl;preview.hidden=false;$("logoPreviewPlaceholder").hidden=true;$("logoFileName").textContent=file.name+" · "+(file.size/1024/1024).toFixed(2)+" MB";};
+const logoDropZone=$("logoDropZone"),logoInput=$("restaurantLogoFile");
+$("chooseRestaurantLogo").onclick=event=>{event.stopPropagation();logoInput.click();};
+logoDropZone.onclick=event=>{if(event.target.closest("button"))return;logoInput.click();};
+logoDropZone.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();logoInput.click();}};
+["dragenter","dragover"].forEach(type=>logoDropZone.addEventListener(type,event=>{event.preventDefault();logoDropZone.classList.add("is-dragover");}));
+["dragleave","dragend"].forEach(type=>logoDropZone.addEventListener(type,event=>{event.preventDefault();logoDropZone.classList.remove("is-dragover");}));
+logoDropZone.addEventListener("drop",event=>{event.preventDefault();logoDropZone.classList.remove("is-dragover");const file=event.dataTransfer?.files?.[0];if(!file)return;const transfer=new DataTransfer();transfer.items.add(file);logoInput.files=transfer.files;logoInput.dispatchEvent(new Event("change",{bubbles:true}));});
+$("saveRestaurantLogo").onclick=async()=>{const button=$("saveRestaurantLogo"),file=$("restaurantLogoFile").files[0];button.disabled=true;try{if(!file)throw Error("ჯერ აირჩიე ლოგოს ფაილი.");const restaurantLogo=await encodeProductPhoto(file);await updateDoc(doc(db,"restaurants",slug),{restaurantLogo});showLogoStatus("ლოგო წარმატებით შეინახა","შენი რესტორნის ლოგო შენახულია და QR მენიუში გამოჩნდება.",true);}catch(error){showLogoStatus("ლოგოს შენახვა ვერ მოხერხდა",error.message||"სცადე თავიდან.",false);}finally{button.disabled=false;}};
+$("removeRestaurantLogo").onclick=async()=>{const button=$("removeRestaurantLogo");button.disabled=true;try{await updateDoc(doc(db,"restaurants",slug),{restaurantLogo:""});$("restaurantLogoFile").value="";$("restaurantLogoPreview").hidden=true;$("restaurantLogoPreview").removeAttribute("src");$("logoPreviewPlaceholder").hidden=false;$("logoFileName").textContent="PNG, JPG ან WebP · მაქს. 5 MB";showLogoStatus("ლოგო წაიშალა","რესტორნის ლოგო წარმატებით წაიშალა.",true);}catch(error){showLogoStatus("ლოგოს წაშლა ვერ მოხერხდა",error.message||"სცადე თავიდან.",false);}finally{button.disabled=false;}};
+
 $("themeColor").oninput = event => renderTheme(event.target.value);
 $("saveTheme").onclick = async () => {
   const button = $("saveTheme"); button.disabled = true;
@@ -451,7 +346,6 @@ $("saveTheme").onclick = async () => {
 };
 $("dishForm").onsubmit = async event => {
   event.preventDefault(); const button=$("saveDish"); button.disabled=true;
-  let photoFile;
   try {
     const id=$("dishId").value, existing=id ? products.get(id) : null;
     if (id && !existing) throw Error("პროდუქტი უკვე წაშლილია.");
@@ -461,26 +355,14 @@ $("dishForm").onsubmit = async event => {
     const productDoc=id ? doc(menuRef,id) : doc(menuRef);
     let imageUrl=existing?.imageUrl || "";
     if ($("removeImage").checked) imageUrl="";
-    photoFile=$("dishImage").files[0];
-    if (photoFile) {
-      setPhotoProgress("dish", 5, "ფოტოს ვამზადებ…");
-      imageUrl=await encodeProductPhoto(photoFile);
-      setPhotoProgress("dish", 55, "ფოტო დამუშავდა. ვტვირთავ…");
-    }
+    const file=$("dishImage").files[0];
+    if (file) imageUrl=await encodeProductPhoto(file);
     const data={ name,price:Math.round(price*100)/100,description:$("dishDescription").value.trim(),category:"",
       categoryId,imageUrl,imagePath:"",active:$("dishActive").checked,updatedAt:serverTimestamp() };
-    if (photoFile) setPhotoProgress("dish", 78, "ფოტო ინახება მენიუში…");
     if (existing) await updateDoc(productDoc,data);
     else await setDoc(productDoc,{...data,createdAt:serverTimestamp()});
-    if (photoFile) setPhotoProgress("dish", 100, "ფოტო აიტვირთა.", "complete");
-    resetProduct();
-    if (photoFile) setPhotoProgress("dish", 100, "ფოტო აიტვირთა.", "complete");
-    say(existing ? "პროდუქტი განახლდა." : "პროდუქტი დაემატა.");
+    resetProduct(); say(existing ? "პროდუქტი განახლდა." : "პროდუქტი დაემატა.");
   } catch(error) {
-    if (photoFile) {
-      const progress = $("dishPhotoProgress");
-      setPhotoProgress("dish", progress.value, `ატვირთვა ვერ დასრულდა: ${error.message}`, "error");
-    }
     say("შეცდომა: "+error.message);
   } finally { button.disabled=false; }
 };
@@ -528,16 +410,17 @@ onAuthStateChanged(auth,async user => {
     if (!slug) throw Error("რესტორანი არ არის არჩეული. შედი ანგარიშში ხელახლა.");
     const restaurant=await requireOwner(slug);
     $("restaurantInfo").textContent=restaurant.name;
-    renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);
+    renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);if(restaurant.restaurantLogo){$("restaurantLogoPreview").src=restaurant.restaurantLogo;$("restaurantLogoPreview").hidden=false;$("logoPreviewPlaceholder").hidden=true;}
     $("merchantLink").href="merchant.html?restaurant="+encodeURIComponent(slug);
+    $("reportLink").href="report.html?restaurant="+encodeURIComponent(slug);
     $("dashboardContent").hidden=false;
     listen(menuRef,products,() => { renderProducts(); renderCategories(); },() => { productsLoaded = true; });
     listen(categoryRef,categories,renderCategories,() => { categoriesLoaded = true; });
     listen(tableRef,tables,renderTables);
-  } catch(error) { say(error.message); }
+  } catch(error) { $("restaurantInfo").textContent="პანელის ჩატვირთვა ვერ მოხერხდა"; say("შეცდომა: "+(error?.message || error)); }
 });
 window.addEventListener("pagehide",() => {
   stopped=true; unsubscribers.forEach(unsubscribe => unsubscribe());
-  if(imageObjectURL) URL.revokeObjectURL(imageObjectURL);
+  if(imageObjectURL) URL.revokeObjectURL(imageObjectURL);if(restaurantLogoPreviewUrl)URL.revokeObjectURL(restaurantLogoPreviewUrl);
 });
 
