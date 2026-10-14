@@ -47,7 +47,7 @@ function render(orders){
   else list.forEach(o=>cards.append(makeOrderCard(o)));
  }
  const active=orders.filter(o=>!["completed","cancelled"].includes(o.status)).length;
- const ready=orders.filter(o=>o.status==="completed").length;
+ const ready=orders.filter(o=>o.status==="completed"&&!o.archived).length;
  $("status").textContent="აქტიური: "+active+" · მზადაა: "+ready+" · სულ: "+orders.length;
 }
 async function change(id,data,b){
