@@ -320,7 +320,8 @@ $("importMenuSubmit").onclick = async () => {
 $("restaurantLogoFile").onchange=()=>{const file=$("restaurantLogoFile").files[0],preview=$("restaurantLogoPreview");if(restaurantLogoPreviewUrl)URL.revokeObjectURL(restaurantLogoPreviewUrl);restaurantLogoPreviewUrl="";if(!file){preview.hidden=true;preview.removeAttribute("src");return;}if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>5*1024*1024){$("restaurantLogoFile").value="";say("ლოგო უნდა იყოს JPEG, PNG ან WebP და მაქსიმუმ 5 MB.");return;}restaurantLogoPreviewUrl=URL.createObjectURL(file);preview.src=restaurantLogoPreviewUrl;preview.hidden=false;};
 $("saveRestaurantLogo").onclick=async()=>{const button=$("saveRestaurantLogo"),file=$("restaurantLogoFile").files[0];button.disabled=true;try{if(!file)throw Error("ჯერ აირჩიე ლოგოს ფაილი.");const restaurantLogo=await encodeProductPhoto(file);await updateDoc(doc(db,"restaurants",slug),{restaurantLogo});say("რესტორნის ლოგო შენახულია და QR მენიუში გამოჩნდება.");}catch(error){say("ლოგოს შენახვა ვერ მოხერხდა: "+error.message);}finally{button.disabled=false;}};
 $("removeRestaurantLogo").onclick=async()=>{const button=$("removeRestaurantLogo");button.disabled=true;try{await updateDoc(doc(db,"restaurants",slug),{restaurantLogo:""});$("restaurantLogoFile").value="";$("restaurantLogoPreview").hidden=true;say("რესტორნის ლოგო წაიშალა.");}catch(error){say("ლოგოს წაშლა ვერ მოხერხდა: "+error.message);}finally{button.disabled=false;}};
-\n$("themeColor").oninput = event => renderTheme(event.target.value);
+
+$("themeColor").oninput = event => renderTheme(event.target.value);
 $("saveTheme").onclick = async () => {
   const button = $("saveTheme"); button.disabled = true;
   try {
