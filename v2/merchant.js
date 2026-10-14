@@ -27,10 +27,10 @@ function makeOrderCard(o){
  if(o.paymentStatus!=="paid"){
   const b=make("button","secondary","გადახდილია");b.onclick=()=>change(o.id,{paymentStatus:"paid"},b);actions.append(b);
  }
- if(o.status==="completed"){
+ if(o.status==="completed" && o.paymentStatus==="paid"){
   const b=make("button","secondary","✓ დაფიდან მოცილება");
-  b.title="შეკვეთა ანგარიშგებაში დარჩება, მხოლოდ ამ დაფიდან დაიმალება";
-  b.onclick=()=>{if(confirm("მოვაშოროთ ეს შეკვეთა „მზადაა“ სვეტიდან? ანგარიშგებაში შეკვეთა შენარჩუნდება."))change(o.id,{archived:true},b)};
+  b.title="გადახდილი შეკვეთა ანგარიშგებაში დარჩება, მხოლოდ ამ დაფიდან დაიმალება";
+  b.onclick=()=>{if(confirm("მოვაშოროთ ეს გადახდილი შეკვეთა „მზადაა“ სვეტიდან? ანგარიშგებაში შეკვეთა შენარჩუნდება."))change(o.id,{archived:true},b)};
   actions.append(b);
  }
  if(actions.childElementCount)c.append(actions);
