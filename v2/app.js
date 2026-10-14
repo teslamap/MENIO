@@ -77,8 +77,10 @@ if($("loginForm")) $("loginForm").addEventListener("submit",async event=>{
     if(owners.empty) {
       $("email").value=credential.user.email || "";
       $("password").value=$("loginPassword").value;
-      msg("ანგარიშში შესული ხარ. რესტორნის შესაქმნელად შეავსე ფორმა ზემოთ.");
-      $("registerForm").scrollIntoView({behavior:"smooth"}); $("restaurantName").focus();
+      msg("ანგარიში არსებობს, მაგრამ რესტორანი ჯერ არ არის შექმნილი. დაასრულე რეგისტრაცია.");
+      const dialog=$("registerDialog");
+      if(dialog && !dialog.open) dialog.showModal();
+      $("restaurantName").focus();
       return;
     }
     if(owners.size===1) location.href="dashboard.html?restaurant="+encodeURIComponent(owners.docs[0].id);
