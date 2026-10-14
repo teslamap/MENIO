@@ -54,8 +54,28 @@ function render(orders){
 async function change(id,data,b){
  b.disabled=true;
  const previous=b.textContent;b.textContent="ინახება…";
- try{await updateDoc(doc(db,"orders",id),data)}
- catch(e){showToast("შეკვეთის განახლება ვერ მოხერხდა: "+e.message,"error")}
+ try{
+  await updateDoc(doc(db,"orders",id),data);
+  if(data.status==="completed"){
+   b.textContent="Push იგზავნება…";
+   try{
+    const user=auth.currentUser;
+    if(!user)throw new Error("მომხმარებელი ავტორიზებული არ არის");
+    const idToken=await user.getIdToken();
+    const response=await fetch("https://menio-push.suloanani1.workers.dev/",{
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({idToken,orderId:id})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.error||("HTTP "+response.status));
+    showToast("შეკვეთა მზადაა — Push შეტყობინება გაიგზავნა","success");
+   }catch(pushError){
+    console.error("MENIO Push error:",pushError);
+    showToast("შეკვეთა მზადაა, მაგრამ Push ვერ გაიგზავნა: "+(pushError.message||"შეცდომა"),"error");
+   }
+  }
+ }catch(e){showToast("შეკვეთის განახლება ვერ მოხერხდა: "+e.message,"error")}
  finally{b.disabled=false;b.textContent=previous}
 }
 onAuthStateChanged(auth,async user=>{
