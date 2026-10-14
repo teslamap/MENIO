@@ -149,3 +149,9 @@ p{color:var(--muted)}
   .customer-menu .my-orders-button{border-radius:999px;white-space:nowrap}
   .customer-menu .header-cart{border-radius:999px;white-space:nowrap}
 }
+
+/* Keep sticky category navigation below the taller, wrapping mobile header */
+@media(max-width:560px){
+  .customer-menu .menu-header{z-index:30}
+  .customer-menu .category-tabs{top:140px;z-index:20}
+}
