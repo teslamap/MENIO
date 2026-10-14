@@ -405,7 +405,7 @@ onAuthStateChanged(auth,async user => {
     listen(menuRef,products,() => { renderProducts(); renderCategories(); },() => { productsLoaded = true; });
     listen(categoryRef,categories,renderCategories,() => { categoriesLoaded = true; });
     listen(tableRef,tables,renderTables);
-  } catch(error) { say(error.message); }
+  } catch(error) { $("restaurantInfo").textContent="პანელის ჩატვირთვა ვერ მოხერხდა"; say("შეცდომა: "+(error?.message || error)); }
 });
 window.addEventListener("pagehide",() => {
   stopped=true; unsubscribers.forEach(unsubscribe => unsubscribe());
