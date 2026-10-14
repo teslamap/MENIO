@@ -7,7 +7,7 @@ android {
     namespace = "ge.menio.merchant"
     compileSdk = 35
 
-    defaultConfig {
+    buildFeatures {\n        buildConfig = true\n    }\n\n    defaultConfig {
         applicationId = "ge.menio.merchant"
         minSdk = 23
         targetSdk = 35
