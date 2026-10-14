@@ -2,6 +2,54 @@ import{auth,db,doc,updateDoc,onAuthStateChanged,signOut}from"./firebase.js";
 import{requireOwner,listenOrders}from"./app.js";
 import{confirmDialog,showToast}from"./ui.js?v=20261014-ui-1";
 const slug=new URLSearchParams(location.search).get("restaurant"),$=id=>document.getElementById(id);
+let soundEnabled=false,audioContext=null,alertTimer=null,lastOrderIds=null;
+const alertedOrders=new Set();
+function beep(){
+ if(!soundEnabled)return;
+ try{
+  audioContext=audioContext||new (window.AudioContext||window.webkitAudioContext)();
+  if(audioContext.state==="suspended")audioContext.resume();
+  const now=audioContext.currentTime;
+  [0,0.22,0.44].forEach((offset,index)=>{
+   const osc=audioContext.createOscillator(),gain=audioContext.createGain();
+   osc.type="sine";osc.frequency.value=index===1?1046:880;
+   gain.gain.setValueAtTime(0.0001,now+offset);
+   gain.gain.exponentialRampToValueAtTime(0.24,now+offset+0.025);
+   gain.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.18);
+   osc.connect(gain);gain.connect(audioContext.destination);
+   osc.start(now+offset);osc.stop(now+offset+0.2);
+  });
+ }catch(e){console.warn("MENIO sound unavailable",e)}
+}
+function stopAlert(){if(alertTimer){clearInterval(alertTimer);alertTimer=null}}
+function updateSoundButton(){
+ const b=$("soundToggle");if(!b)return;
+ b.textContent=soundEnabled?"🔊 ხმა ჩართულია":"🔇 ხმის ჩართვა";
+ b.classList.toggle("sound-on",soundEnabled);
+ b.setAttribute("aria-pressed",String(soundEnabled));
+}
+$("soundToggle")?.addEventListener("click",async()=>{
+ try{
+  audioContext=audioContext||new (window.AudioContext||window.webkitAudioContext)();
+  await audioContext.resume();soundEnabled=true;updateSoundButton();beep();
+  showToast("შეკვეთის ხმოვანი სიგნალი ჩართულია","success");
+ }catch(e){showToast("ხმის ჩართვა ვერ მოხერხდა — შეამოწმე მოწყობილობის ხმა","error")}
+});
+function monitorNewOrders(orders){
+ const incoming=orders.filter(o=>!o.archived&&["new","accepted"].includes(o.status));
+ const currentIds=new Set(incoming.map(o=>String(o.id)));
+ if(lastOrderIds!==null){
+  const fresh=incoming.filter(o=>!lastOrderIds.has(String(o.id)));
+  if(fresh.length){
+   fresh.forEach(o=>alertedOrders.add(String(o.id)));
+   if(soundEnabled){beep();stopAlert();alertTimer=setInterval(beep,2400)}
+   showToast(fresh.length===1?"ახალი შეკვეთა შემოვიდა!":"ახალი შეკვეთები შემოვიდა: "+fresh.length,"success");
+  }
+ }
+ lastOrderIds=currentIds;
+ for(const id of [...alertedOrders])if(!currentIds.has(id))alertedOrders.delete(id);
+ if(!alertedOrders.size)stopAlert();
+}
 const laneConfig=[
  {key:"incoming",statuses:["new","accepted"],title:"შემოსული",empty:"ახალი შეკვეთები აქ გამოჩნდება"},
  {key:"preparing",statuses:["preparing"],title:"მზადდება",empty:"მომზადებაში შეკვეთა არ არის"},
@@ -43,6 +91,7 @@ function makeOrderCard(o){
  return c;
 }
 function render(orders){
+ monitorNewOrders(orders);
  const lanes=Object.fromEntries(laneConfig.map(l=>[l.key,$("orders").querySelector(".lane-"+l.key)]));
  for(const lane of laneConfig){
   const root=lanes[lane.key],cards=root.querySelector(".lane-cards"),count=root.querySelector(".lane-count");
@@ -88,6 +137,7 @@ onAuthStateChanged(auth,async user=>{
  try{
   await requireOwner(slug);
   $("logout").onclick=async()=>{await signOut(auth);location.href="register.html#login"};
+  updateSoundButton();
   listenOrders(slug,render,e=>{$("status").textContent="შეკვეთების ჩატვირთვის შეცდომა";const error=make("p","board-error",e.message);$("orders").replaceChildren(error)});
  }catch(e){$("status").textContent="წვდომის შეცდომა: "+e.message}
 });
