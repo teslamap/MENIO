@@ -3,7 +3,7 @@ import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/12.4.0/f
 import {initializeApp,getApps} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 
 // Paste the Web Push certificate key from Firebase Console > Project settings > Cloud Messaging.
-const VAPID_PUBLIC_KEY = "";
+const VAPID_PUBLIC_KEY = "BJyChlg94I6fWtLkj6TxBbei-mlxTw_TlfTtfm31F2LMenTxdhOl-Esa7DO6E57mYDtaCfkvcqXIYZDtjjI1BvY";
 let audioContext=null,soundEnabled=false,seenStatuses=new Map(),unsubscribe=null,repeatTimer=null,readyDialog=null,permissionPrompt=null,enableResolver=null,pushToken=null;
 const $=id=>document.getElementById(id),status=$("orderSoundStatus");
 function setStatus(text){if(status)status.textContent=text;}
@@ -36,7 +36,8 @@ async function activateSound(){
   soundEnabled=audioContext.state==="running";if(!soundEnabled){resolveEnable(false);return;}
   playChime();
   if("Notification" in window&&Notification.permission==="default"){try{await Notification.requestPermission();}catch{}}
-  setStatus("შეკვეთის ხმა ჩართულია ✓");resolveEnable(true);
+  await setupPush();
+  setStatus(pushToken?"შეკვეთის ხმა და Push ჩართულია ✓":"შეკვეთის ხმა ჩართულია ✓");resolveEnable(true);
  }catch(e){setStatus("ხმის ჩართვა ვერ მოხერხდა. სცადე ხელახლა.");resolveEnable(false);}
 }
 function ensureEnabled(){
