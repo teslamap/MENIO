@@ -35,7 +35,7 @@ function render(orders){
  for(const lane of laneConfig){
   const root=lanes[lane.key],cards=root.querySelector(".lane-cards"),count=root.querySelector(".lane-count");
   cards.replaceChildren();
-  const list=orders.filter(o=>lane.statuses.includes(o.status));
+  const list=orders.filter(o=>!o.archived && lane.statuses.includes(o.status));
   count.textContent=String(list.length);
   if(!list.length)cards.append(make("div","board-empty",lane.empty));
   else list.forEach(o=>cards.append(makeOrderCard(o)));
