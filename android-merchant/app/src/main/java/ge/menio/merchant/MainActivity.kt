@@ -8,10 +8,28 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebSettings
+import android.webkit.JavascriptInterface
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.widget.FrameLayout
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+    private var toneGenerator: ToneGenerator? = null
+
+    inner class MerchantSoundBridge {
+        @JavascriptInterface
+        fun playOrderAlert() {
+            runOnUiThread {
+                try {
+                    if (toneGenerator == null) toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 90)
+                    toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 420)
+                } catch (_: Exception) {
+                    // Web Audio remains the fallback if native audio is unavailable.
+                }
+            }
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,6 +51,7 @@ class MainActivity : Activity() {
         webView.setBackgroundColor(android.graphics.Color.WHITE)
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = WebChromeClient()
+        webView.addJavascriptInterface(MerchantSoundBridge(), "MenioNative")
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -69,6 +88,8 @@ class MainActivity : Activity() {
             webView.stopLoading()
             webView.destroy()
         }
+        toneGenerator?.release()
+        toneGenerator = null
         super.onDestroy()
     }
 }
