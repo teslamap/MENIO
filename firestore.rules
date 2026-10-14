@@ -30,7 +30,113 @@ service cloud.firestore {
         && request.resource.data.slug == resource.data.slug
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tableCount', 'nextTableNumber', 'active', 'themeColor', 'restaurantLogo'])
         && (!('themeColor' in request.resource.data) || (request.resource.data.themeColor is string
-          && request.resource.data.themeColor.matches('^#[0-9a-fA-F]{6}$')))
+          && request.resource.data.themeColor.matches('^#[0-9a-fA-F]{6}
+        && request.resource.data.tableCount is int
+        && request.resource.data.tableCount >= 0
+        && request.resource.data.tableCount <= 200
+        && (!('nextTableNumber' in resource.data) || request.resource.data.nextTableNumber >= resource.data.nextTableNumber);
+      allow delete: if false;
+
+      match /tables/{tableId} {
+        allow read: if true;
+        allow create, update: if owns(slug)
+          && request.resource.data.keys().hasOnly(['number', 'active', 'label'])
+          && request.resource.data.number is int
+          && request.resource.data.number >= 1
+          && tableId == string(request.resource.data.number)
+          && request.resource.data.active is bool
+          && request.resource.data.label is string
+          && request.resource.data.label.size() <= 80
+          && (resource == null || (request.resource.data.number == resource.data.number
+            && (resource.data.active == true || request.resource.data.active == false)));
+        allow delete: if false;
+      }
+      match /categories/{categoryId} {
+        allow read: if true;
+        allow create, update: if owns(slug)
+          && request.resource.data.keys().hasOnly(['name', 'createdAt', 'updatedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 80
+          && request.resource.data.createdAt is timestamp;
+        allow delete: if owns(slug);
+      }
+      match /menu/{dishId} {
+        allow read: if true;
+        allow create, update: if owns(slug)
+          && request.resource.data.keys().hasOnly(['name', 'description', 'price', 'categoryId', 'category', 'active', 'imageUrl', 'imagePath', 'createdAt', 'updatedAt', 'demo'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 120
+          && request.resource.data.description is string
+          && request.resource.data.description.size() <= 2000
+          && request.resource.data.price is number
+          && request.resource.data.price > 0
+          && request.resource.data.price <= 100000
+          && request.resource.data.active is bool
+          && (!('categoryId' in request.resource.data) || request.resource.data.categoryId == ''
+            || exists(/databases/$(database)/documents/restaurants/$(slug)/categories/$(request.resource.data.categoryId)))
+          && (!('imageUrl' in request.resource.data) || (request.resource.data.imageUrl is string
+            && ((request.resource.data.imageUrl.size() <= 2048 && (request.resource.data.imageUrl == '' || request.resource.data.imageUrl.matches('https://.*')))
+              || (request.resource.data.imageUrl.size() <= 180000
+                && request.resource.data.imageUrl.matches('data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}')))))
+          && (!('imagePath' in request.resource.data) || request.resource.data.imagePath is string);
+        allow delete: if owns(slug);
+      }
+    }
+
+    match /restaurantOwners/{slug} {
+      // A missing owner record may be read during a uniqueness check; existing records are private.
+      allow read: if signedIn()
+        && (!exists(/databases/$(database)/documents/restaurantOwners/$(slug))
+          || resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/restaurants/$(slug))
+        && getAfter(/databases/$(database)/documents/restaurants/$(slug)).data.slug == slug;
+      allow update, delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['restaurantSlug', 'tableNumber', 'tableId', 'items', 'total', 'status', 'paymentStatus', 'createdAt'])
+        && request.resource.data.restaurantSlug is string
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.tableNumber is int
+        && request.resource.data.tableId is string
+        && request.resource.data.tableId == string(request.resource.data.tableNumber)
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.total is number
+        && request.resource.data.total > 0
+        && request.resource.data.status == 'new'
+        && request.resource.data.paymentStatus == 'unpaid'
+        && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug))
+        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)).data.active == true
+        && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId))
+        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.number == request.resource.data.tableNumber
+        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.active == true;
+      allow read: if signedIn() && (ownsExisting(resource.data.restaurantSlug) || resource.data.customerUid == request.auth.uid);
+      allow update: if signedIn()
+        && ownsExisting(resource.data.restaurantSlug)
+        && request.resource.data.restaurantSlug == resource.data.restaurantSlug
+        && request.resource.data.tableNumber == resource.data.tableNumber
+        && request.resource.data.tableId == resource.data.tableId
+        && request.resource.data.items == resource.data.items
+        && request.resource.data.total == resource.data.total
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'archived'])
+        && (!('archived' in request.resource.data) || request.resource.data.archived is bool)
+        && request.resource.data.status in ['new', 'accepted', 'preparing', 'completed', 'cancelled']
+        && request.resource.data.paymentStatus in ['unpaid', 'paid'];
+      allow delete: if signedIn() && ownsExisting(resource.data.restaurantSlug);
+    }
+  }
+}
+)))
+        && (!('restaurantLogo' in request.resource.data) || (request.resource.data.restaurantLogo is string
+          && request.resource.data.restaurantLogo.size() <= 180000
+          && (request.resource.data.restaurantLogo == '' || request.resource.data.restaurantLogo.matches('data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}'))))
         && request.resource.data.tableCount is int
         && request.resource.data.tableCount >= 0
         && request.resource.data.tableCount <= 200
