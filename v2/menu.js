@@ -52,7 +52,7 @@ function renderTabs(){
   const groups=new Map(dishes.map(dish=>[groupId(dish),groupName(dish)]));
   if(selectedCategory!=="all" && !groups.has(selectedCategory)) selectedCategory="all";
   $("categoryTabs").replaceChildren();
-  for(const [id,name] of new Map([["all","ყველა"],...groups])){
+  for(const [id,name] of new Map([["all","ყველა პროდუქტი"],...groups])){
     const button=el("button",name,"secondary small-button");
     button.setAttribute("aria-pressed",String(id===selectedCategory));
     button.onclick=()=>{selectedCategory=id;renderTabs();render();};
