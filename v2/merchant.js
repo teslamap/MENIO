@@ -1,5 +1,6 @@
 import{auth,db,doc,updateDoc,onAuthStateChanged,signOut}from"./firebase.js";
 import{requireOwner,listenOrders}from"./app.js";
+import{confirmDialog,showToast}from"./ui.js?v=20261014-ui-1";
 const slug=new URLSearchParams(location.search).get("restaurant"),$=id=>document.getElementById(id);
 const laneConfig=[
  {key:"incoming",statuses:["new","accepted"],title:"შემოსული",empty:"ახალი შეკვეთები აქ გამოჩნდება"},
@@ -30,7 +31,7 @@ function makeOrderCard(o){
  if(o.status==="completed" && o.paymentStatus==="paid"){
   const b=make("button","secondary","✓ დაფიდან მოცილება");
   b.title="გადახდილი შეკვეთა ანგარიშგებაში დარჩება, მხოლოდ ამ დაფიდან დაიმალება";
-  b.onclick=()=>{if(confirm("მოვაშოროთ ეს გადახდილი შეკვეთა „მზადაა“ სვეტიდან? ანგარიშგებაში შეკვეთა შენარჩუნდება."))change(o.id,{archived:true},b)};
+  b.onclick=async()=>{if(await confirmDialog("მოვაშოროთ ეს გადახდილი შეკვეთა „მზადაა“ სვეტიდან? ანგარიშგებაში შეკვეთა შენარჩუნდება.",{title:"შეკვეთის დამალვა",confirmText:"დამალვა"}))change(o.id,{archived:true},b)};
   actions.append(b);
  }
  if(actions.childElementCount)c.append(actions);
@@ -54,7 +55,7 @@ async function change(id,data,b){
  b.disabled=true;
  const previous=b.textContent;b.textContent="ინახება…";
  try{await updateDoc(doc(db,"orders",id),data)}
- catch(e){alert("შეკვეთის განახლება ვერ მოხერხდა: "+e.message)}
+ catch(e){showToast("შეკვეთის განახლება ვერ მოხერხდა: "+e.message,"error")}
  finally{b.disabled=false;b.textContent=previous}
 }
 onAuthStateChanged(auth,async user=>{
