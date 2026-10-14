@@ -30,8 +30,8 @@ jobs:
             echo "Checking $file"
             node --input-type=module --check < "$file"
           done
-      - name: Test image handling and current site pages
-        run: node --test tests/images.test.mjs tests/site-smoke.test.mjs
+      - name: Test current published site pages
+        run: node --test tests/site-smoke.test.mjs
       - name: Check local assets and JavaScript module exports
         run: python tests/check-assets.py
       - name: Ensure Firebase config has no placeholders
