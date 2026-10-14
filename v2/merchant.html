@@ -43,7 +43,7 @@
 <header class="topbar">
 <a class="logo" href="index.html">MENIO<span>.</span></a>
 <div class="row"><span class="live-dot"></span><span>ცოცხალი შეკვეთები</span><button id="logout" class="secondary small-button">გასვლა</button></div>
-<a id="backToDashboard" class="btn secondary small-button" href="register.html#login">მართვის პანელი</a>
+<div class="row"><a id="reportLink" class="btn secondary small-button" href="report.html">ანგარიშგება</a><a id="backToDashboard" class="btn secondary small-button" href="register.html#login">მართვის პანელი</a></div>
 </header>
 <div class="merchant-title">
 <div><p class="eyebrow">MENIO PARTNER · LIVE ORDERS</p><h1>შეკვეთების დაფა</h1><p id="status">შეკვეთებს ველოდები…</p></div>
@@ -58,7 +58,7 @@
 <script type="module" src="merchant.js?v=20261014-merchant-board-1"></script>
 <script type="module">
 const slug=new URLSearchParams(location.search).get("restaurant");
-if(slug)document.getElementById("backToDashboard").href="dashboard.html?restaurant="+encodeURIComponent(slug);
+if(slug){document.getElementById("backToDashboard").href="dashboard.html?restaurant="+encodeURIComponent(slug);document.getElementById("reportLink").href="report.html?restaurant="+encodeURIComponent(slug);}
 </script>
 </body>
 </html>
