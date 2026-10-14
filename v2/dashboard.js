@@ -320,9 +320,16 @@ $("importMenuSubmit").onclick = async () => {
   } catch(error) { say("იმპორტი ვერ დასრულდა: " + error.message); }
   finally { button.disabled = !pendingMenuImport.length; }
 };
-$("restaurantLogoFile").onchange=()=>{const file=$("restaurantLogoFile").files[0],preview=$("restaurantLogoPreview");if(restaurantLogoPreviewUrl)URL.revokeObjectURL(restaurantLogoPreviewUrl);restaurantLogoPreviewUrl="";if(!file){preview.hidden=true;preview.removeAttribute("src");return;}if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>5*1024*1024){$("restaurantLogoFile").value="";say("ლოგო უნდა იყოს JPEG, PNG ან WebP და მაქსიმუმ 5 MB.");return;}restaurantLogoPreviewUrl=URL.createObjectURL(file);preview.src=restaurantLogoPreviewUrl;preview.hidden=false;};
+$("restaurantLogoFile").onchange=()=>{const file=$("restaurantLogoFile").files[0],preview=$("restaurantLogoPreview");if(restaurantLogoPreviewUrl)URL.revokeObjectURL(restaurantLogoPreviewUrl);restaurantLogoPreviewUrl="";if(!file){preview.hidden=true;preview.removeAttribute("src");$("logoPreviewPlaceholder").hidden=false;$("logoFileName").textContent="PNG, JPG ან WebP · მაქს. 5 MB";return;}if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>5*1024*1024){$("restaurantLogoFile").value="";$("logoFileName").textContent="PNG, JPG ან WebP · მაქს. 5 MB";say("ლოგო უნდა იყოს JPEG, PNG ან WebP და მაქსიმუმ 5 MB.");return;}restaurantLogoPreviewUrl=URL.createObjectURL(file);preview.src=restaurantLogoPreviewUrl;preview.hidden=false;$("logoPreviewPlaceholder").hidden=true;$("logoFileName").textContent=file.name+" · "+(file.size/1024/1024).toFixed(2)+" MB";};
+const logoDropZone=$("logoDropZone"),logoInput=$("restaurantLogoFile");
+$("chooseRestaurantLogo").onclick=event=>{event.stopPropagation();logoInput.click();};
+logoDropZone.onclick=event=>{if(event.target.closest("button"))return;logoInput.click();};
+logoDropZone.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();logoInput.click();}};
+["dragenter","dragover"].forEach(type=>logoDropZone.addEventListener(type,event=>{event.preventDefault();logoDropZone.classList.add("is-dragover");}));
+["dragleave","dragend"].forEach(type=>logoDropZone.addEventListener(type,event=>{event.preventDefault();logoDropZone.classList.remove("is-dragover");}));
+logoDropZone.addEventListener("drop",event=>{event.preventDefault();logoDropZone.classList.remove("is-dragover");const file=event.dataTransfer?.files?.[0];if(!file)return;const transfer=new DataTransfer();transfer.items.add(file);logoInput.files=transfer.files;logoInput.dispatchEvent(new Event("change",{bubbles:true}));});
 $("saveRestaurantLogo").onclick=async()=>{const button=$("saveRestaurantLogo"),file=$("restaurantLogoFile").files[0];button.disabled=true;try{if(!file)throw Error("ჯერ აირჩიე ლოგოს ფაილი.");const restaurantLogo=await encodeProductPhoto(file);await updateDoc(doc(db,"restaurants",slug),{restaurantLogo});say("რესტორნის ლოგო შენახულია და QR მენიუში გამოჩნდება.");}catch(error){say("ლოგოს შენახვა ვერ მოხერხდა: "+error.message);}finally{button.disabled=false;}};
-$("removeRestaurantLogo").onclick=async()=>{const button=$("removeRestaurantLogo");button.disabled=true;try{await updateDoc(doc(db,"restaurants",slug),{restaurantLogo:""});$("restaurantLogoFile").value="";$("restaurantLogoPreview").hidden=true;say("რესტორნის ლოგო წაიშალა.");}catch(error){say("ლოგოს წაშლა ვერ მოხერხდა: "+error.message);}finally{button.disabled=false;}};
+$("removeRestaurantLogo").onclick=async()=>{const button=$("removeRestaurantLogo");button.disabled=true;try{await updateDoc(doc(db,"restaurants",slug),{restaurantLogo:""});$("restaurantLogoFile").value="";$("restaurantLogoPreview").hidden=true;$("restaurantLogoPreview").removeAttribute("src");$("logoPreviewPlaceholder").hidden=false;$("logoFileName").textContent="PNG, JPG ან WebP · მაქს. 5 MB";say("რესტორნის ლოგო წაიშალა.");}catch(error){say("ლოგოს წაშლა ვერ მოხერხდა: "+error.message);}finally{button.disabled=false;}};
 
 $("themeColor").oninput = event => renderTheme(event.target.value);
 $("saveTheme").onclick = async () => {
@@ -401,7 +408,7 @@ onAuthStateChanged(auth,async user => {
     if (!slug) throw Error("რესტორანი არ არის არჩეული. შედი ანგარიშში ხელახლა.");
     const restaurant=await requireOwner(slug);
     $("restaurantInfo").textContent=restaurant.name;
-    renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);if(restaurant.restaurantLogo){$("restaurantLogoPreview").src=restaurant.restaurantLogo;$("restaurantLogoPreview").hidden=false;}
+    renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);if(restaurant.restaurantLogo){$("restaurantLogoPreview").src=restaurant.restaurantLogo;$("restaurantLogoPreview").hidden=false;$("logoPreviewPlaceholder").hidden=true;}
     $("merchantLink").href="merchant.html?restaurant="+encodeURIComponent(slug);
     $("reportLink").href="report.html?restaurant="+encodeURIComponent(slug);
     $("dashboardContent").hidden=false;
