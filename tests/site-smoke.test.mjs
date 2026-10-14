@@ -41,3 +41,18 @@ test("main landing page uses project-relative routes",()=>{
   assert.match(html,/<script[^>]+src=["']index-auth\.js/i);
   assert.match(html,/<a[^>]+href=["']register\.html(?:#[^"']*)?["']/i);
 });
+
+test("platform administrator page and role-gated access are present",()=>{
+  const html=fs.readFileSync(path.join(root,"platform-admin.html"),"utf8");
+  const js=fs.readFileSync(path.join(root,"platform-admin.js"),"utf8");
+  const app=fs.readFileSync(path.join(root,"app.js"),"utf8");
+  const rules=fs.readFileSync(path.join(root,"firestore.rules"),"utf8");
+  assert.match(html,/id="adminLoginForm"/);
+  assert.match(html,/id="restaurantGrid"/);
+  assert.match(js,/isPlatformAdmin\(user\)/);
+  assert.match(js,/dashboard\.html\?restaurant=/);
+  assert.match(app,/export async function isPlatformAdmin/);
+  assert.match(app,/if\(!\(await isPlatformAdmin\(\)\)\)/);
+  assert.match(rules,/match \/platformAdmins\/\{uid\}/);
+  assert.match(rules,/allow create, update, delete: if false/);
+});

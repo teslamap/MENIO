@@ -105,10 +105,17 @@ if($("loginForm")) $("loginForm").addEventListener("submit",async event=>{
   } catch(error) { msg(friendlyError(error)); }
   finally { button.disabled=false; }
 });
+export async function isPlatformAdmin(user=auth.currentUser) {
+  if(!user || user.isAnonymous) return false;
+  const admin=await getDoc(doc(db,"platformAdmins",user.uid));
+  return admin.exists() && admin.data().role==="superadmin";
+}
 export async function requireOwner(slug) {
-  if(!auth.currentUser) throw Error("შესასვლელად გაიარე ავტორიზაცია.");
-  const owner=await getDoc(doc(db,"restaurantOwners",slug));
-  if(!owner.exists() || owner.data().ownerUid!==auth.currentUser.uid) throw Error("ამ რესტორანზე წვდომა არ გაქვს.");
+  if(!auth.currentUser || auth.currentUser.isAnonymous) throw Error("შესასვლელად გაიარე ავტორიზაცია.");
+  if(!(await isPlatformAdmin())) {
+    const owner=await getDoc(doc(db,"restaurantOwners",slug));
+    if(!owner.exists() || owner.data().ownerUid!==auth.currentUser.uid) throw Error("ამ რესტორანზე წვდომა არ გაქვს.");
+  }
   const restaurant=await getDoc(doc(db,"restaurants",slug));
   if(!restaurant.exists()) throw Error("რესტორანი ვერ მოიძებნა.");
   return restaurant.data();

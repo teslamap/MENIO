@@ -2,13 +2,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function owns(slug) {
+    function isPlatformAdmin() {
       return signedIn()
-        && getAfter(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid;
+        && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/platformAdmins/$(request.auth.uid)).data.role == 'superadmin';
+    }
+    function owns(slug) {
+      return isPlatformAdmin() || (signedIn()
+        && getAfter(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid);
     }
     function ownsExisting(slug) {
-      return signedIn()
-        && get(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid;
+      return isPlatformAdmin() || (signedIn()
+        && get(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid);
+    }
+
+    match /platformAdmins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update, delete: if false;
     }
 
     match /restaurants/{slug} {
@@ -90,9 +100,9 @@ service cloud.firestore {
 
     match /restaurantOwners/{slug} {
       // A missing owner record may be read during a uniqueness check; existing records are private.
-      allow read: if signedIn()
+      allow read: if isPlatformAdmin() || (signedIn()
         && (!exists(/databases/$(database)/documents/restaurantOwners/$(slug))
-          || resource.data.ownerUid == request.auth.uid);
+          || resource.data.ownerUid == request.auth.uid));
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['ownerUid', 'createdAt'])
         && request.resource.data.ownerUid == request.auth.uid
@@ -119,9 +129,9 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId))
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.number == request.resource.data.tableNumber
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.active == true;
-      allow read: if signedIn() && (ownsExisting(resource.data.restaurantSlug) || resource.data.customerUid == request.auth.uid);
+      allow read: if signedIn() && (isPlatformAdmin() || ownsExisting(resource.data.restaurantSlug) || resource.data.customerUid == request.auth.uid);
       allow update: if signedIn()
-        && ownsExisting(resource.data.restaurantSlug)
+        && (isPlatformAdmin() || ownsExisting(resource.data.restaurantSlug))
         && request.resource.data.restaurantSlug == resource.data.restaurantSlug
         && request.resource.data.tableNumber == resource.data.tableNumber
         && request.resource.data.tableId == resource.data.tableId
@@ -131,7 +141,7 @@ service cloud.firestore {
         && (!('archived' in request.resource.data) || request.resource.data.archived is bool)
         && request.resource.data.status in ['new', 'accepted', 'preparing', 'completed', 'cancelled']
         && request.resource.data.paymentStatus in ['unpaid', 'paid'];
-      allow delete: if signedIn() && ownsExisting(resource.data.restaurantSlug);
+      allow delete: if signedIn() && (isPlatformAdmin() || ownsExisting(resource.data.restaurantSlug));
     }
   }
 }
