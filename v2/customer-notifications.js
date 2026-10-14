@@ -67,7 +67,8 @@ async function setupPush(){
     return pushToken||null;
   }catch(error){console.warn("MENIO Push setup failed",error);return null;}
 }
-\nfunction playChime(){
+
+function playChime(){
  if(!soundEnabled||!audioContext||audioContext.state!=="running")return;
  try{
   const now=audioContext.currentTime,master=audioContext.createGain();master.gain.setValueAtTime(0.95,now);master.connect(audioContext.destination);
