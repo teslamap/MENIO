@@ -198,7 +198,7 @@ async function init(){
   listenCustomerOrders();
   const [rs,ts]=await Promise.all([getDoc(doc(db,"restaurants",slug)),getDoc(doc(db,"restaurants",slug,"tables",String(table)))]);
   if(!rs.exists() || !rs.data().active || !ts.exists() || !ts.data().active)throw Error("რესტორანი ან მაგიდა მიუწვდომელია");
-  restaurant=rs.data();$("restaurantName").textContent=restaurant.name;
+  restaurant=rs.data();$("restaurantName").textContent=restaurant.name;const brandImage=document.getElementById("restaurantBrandLogo");if(brandImage){if(typeof restaurant.restaurantLogo==="string"&&restaurant.restaurantLogo.startsWith("data:image/jpeg;base64,")){brandImage.src=restaurant.restaurantLogo;brandImage.hidden=false;}else{brandImage.hidden=true;brandImage.removeAttribute("src");}}
   const themeColor=typeof restaurant.themeColor==="string" && /^#[0-9a-f]{6}$/i.test(restaurant.themeColor) ? restaurant.themeColor : DEFAULT_THEME_COLOR;
   applyMenuTheme(themeColor);
   const tableInfo=$("tableInfo");if(tableInfo)tableInfo.textContent="მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
