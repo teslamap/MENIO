@@ -134,7 +134,7 @@ async function change(id,data,b){
  finally{b.disabled=false;b.textContent=previous}
 }
 onAuthStateChanged(auth,async user=>{
- if(!user||user.isAnonymous||!slug){location.href="register.html#login";return}
+ if(!user||user.isAnonymous||!slug){location.href="register.html?returnTo=merchant&restaurant="+encodeURIComponent(slug||"")+"#login";return}
  try{
   await requireOwner(slug);
   $("logout").onclick=async()=>{await signOut(auth);location.href="register.html#login"};
