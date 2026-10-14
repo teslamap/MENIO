@@ -102,6 +102,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.keys().hasAll(['restaurantSlug', 'tableNumber', 'tableId', 'items', 'total', 'status', 'paymentStatus', 'createdAt'])
         && request.resource.data.restaurantSlug is string
+        && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.tableNumber is int
         && request.resource.data.tableId is string
         && request.resource.data.tableId == string(request.resource.data.tableNumber)
@@ -116,7 +117,7 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId))
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.number == request.resource.data.tableNumber
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.active == true;
-      allow read: if signedIn() && ownsExisting(resource.data.restaurantSlug);
+      allow read: if signedIn() && (ownsExisting(resource.data.restaurantSlug) || resource.data.customerUid == request.auth.uid);
       allow update: if signedIn()
         && ownsExisting(resource.data.restaurantSlug)
         && request.resource.data.restaurantSlug == resource.data.restaurantSlug
