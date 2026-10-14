@@ -1,4 +1,4 @@
-import {auth,db,collection,query,where,onSnapshot,onAuthStateChanged,signInAnonymously} from "./firebase.js";
+import {auth,db,collection,query,where,onSnapshot,onAuthStateChanged} from "./firebase.js";
 
 const $=id=>document.getElementById(id);
 let audioContext=null,soundEnabled=false,seenStatuses=new Map(),unsubscribe=null;
@@ -76,12 +76,9 @@ function watchOrders(user){
   },error=>{console.warn("MENIO order notification listener",error);setStatus("შეკვეთების შეტყობინება ვერ ჩაიტვირთა.");});
 }
 
-onAuthStateChanged(auth,async user=>{
-  if(!user){
-    try{await signInAnonymously(auth);}catch(e){console.warn("MENIO anonymous sign-in failed",e);setStatus("შეტყობინებების ჩასართავად განაახლე გვერდი.");}
-    return;
-  }
-  if(!user.isAnonymous){watchOrders(user);return;}
-  watchOrders(user);
+onAuthStateChanged(auth,user=>{
+  // menu.js owns authentication and signs QR customers in anonymously.
+  // Start listening only after that sign-in has completed.
+  if(user)watchOrders(user);
 });
 window.addEventListener("pagehide",()=>unsubscribe?.());
