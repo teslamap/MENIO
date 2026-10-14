@@ -128,7 +128,7 @@ service cloud.firestore {
         && (!('archived' in request.resource.data) || request.resource.data.archived is bool)
         && request.resource.data.status in ['new', 'accepted', 'preparing', 'completed', 'cancelled']
         && request.resource.data.paymentStatus in ['unpaid', 'paid'];
-      allow delete: if false;
+      allow delete: if signedIn() && ownsExisting(resource.data.restaurantSlug);
     }
   }
 }
