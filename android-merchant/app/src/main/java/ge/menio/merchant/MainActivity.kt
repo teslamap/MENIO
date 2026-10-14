@@ -66,7 +66,7 @@ class MainActivity : Activity() {
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         setContentView(webView)
         if (savedInstanceState == null) {
-            webView.loadUrl("https://teslamap.github.io/MENIO/v2/merchant.html?restaurant=delicate")
+            webView.loadUrl("https://teslamap.github.io/MENIO/merchant.html?restaurant=delicate")
         } else {
             webView.restoreState(savedInstanceState)
         }
