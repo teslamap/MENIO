@@ -2,7 +2,7 @@ import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAn
 import { safeProductImage } from "./image-utils.js";
 const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table"));
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
-let restaurant, dishes=[], selectedCategory="all", sending=false, ready=false, ordersUnsubscribe=null;
+let restaurant, dishes=[], selectedCategory="all", categoryLanding=true, sending=false, ready=false, ordersUnsubscribe=null;
 let detailId=null;
 $("cartSummary").onclick=()=>$("orderBox").showModal();
 $("cartClose").onclick=()=>$("orderBox").close();
@@ -48,19 +48,54 @@ const say=text=>{ $("message").textContent=text;$("menuStatus").textContent=text
 const el=(tag,text,className)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;};
 function groupId(dish){return dish.categoryId ? "id:"+dish.categoryId : dish.category ? "legacy:"+dish.category : "none";}
 function groupName(dish){return categories.get(dish.categoryId)?.name || dish.category || "სხვა";}
+const CATEGORY_ORDER=["ბურგერი","ქათმის ხორცი","საქონლის ხორცი","ღორის ხორცი","კრევეტები","ზღვის პროდუქტები","ვეგეტარიანული","ხაჭაპური","პიცა","პასტა","სუში","სალათი","წვნიანები","წვნინანები","სენდვიჩი","სნექი","გამაგრილებელი სასმელი","იაპონური ლიმონათი","ყავა","ლუდი","საკე","კორეული არაყი","ვისკი","დანამატი"];
+const normalizeCategory=value=>String(value||"").trim().toLocaleLowerCase("ka").replace(/\s+/g," ");
 function renderTabs(){
-  const groups=new Map(dishes.map(dish=>[groupId(dish),groupName(dish)]));
-  if(selectedCategory!=="all" && !groups.has(selectedCategory)) selectedCategory="all";
-  $("categoryTabs").replaceChildren();
-  for(const [id,name] of new Map([["all","ყველა პროდუქტი"],...groups])){
-    const button=el("button",name,"secondary small-button");
-    button.setAttribute("aria-pressed",String(id===selectedCategory));
-    button.onclick=()=>{selectedCategory=id;renderTabs();render();};
-    $("categoryTabs").append(button);
+  const nav=$("categoryTabs");nav.replaceChildren();
+  if(categoryLanding){nav.hidden=true;return;}
+  nav.hidden=false;
+  const back=el("button","← ყველა კატეგორია","secondary small-button category-back");
+  back.onclick=()=>{categoryLanding=true;selectedCategory="all";renderTabs();render();};
+  nav.append(back);
+}
+function categoryEntries(){
+  const entries=new Map();
+  for(const [id,data] of categories){
+    const name=String(data.name||data.title||"").trim();
+    if(name)entries.set("id:"+id,{id:"id:"+id,name});
   }
+  for(const dish of dishes){
+    const id=groupId(dish),name=groupName(dish);
+    if(!entries.has(id))entries.set(id,{id,name});
+  }
+  const priority=name=>{const n=normalizeCategory(name);let i=CATEGORY_ORDER.findIndex(x=>normalizeCategory(x)===n);if(i<0&&n==="წვნიანები")i=CATEGORY_ORDER.indexOf("წვნინანები");return i<0?999:i;};
+  return [...entries.values()].sort((a,b)=>priority(a.name)-priority(b.name)||a.name.localeCompare(b.name,"ka"));
+}
+function renderCategoryLanding(){
+  const menu=$("menu");menu.replaceChildren();
+  const heading=el("h2","აირჩიე კატეგორია","category-landing-title");
+  menu.append(heading);
+  const grid=el("div",undefined,"category-square-grid");
+  for(const category of categoryEntries()){
+    const product=dishes.find(d=>groupId(d)===category.id&&safeProductImage(d.imageUrl));
+    const tile=el("button",undefined,"category-square");
+    tile.type="button";
+    if(product){
+      const photo=el("img",undefined,"category-square-photo");
+      photo.src=safeProductImage(product.imageUrl);photo.alt="";photo.loading="lazy";
+      photo.onerror=()=>{photo.remove();tile.classList.add("category-square-no-photo");};
+      tile.append(photo);
+    }else tile.classList.add("category-square-no-photo");
+    tile.append(el("span",category.name,"category-square-name"));
+    tile.onclick=()=>{selectedCategory=category.id;categoryLanding=false;renderTabs();render();};
+    grid.append(tile);
+  }
+  menu.append(grid);
+  if(!grid.children.length)menu.append(el("p","კატეგორიები ჯერ არ არის დამატებული.","muted"));
 }
 function render(){
   $("menu").replaceChildren();
+  if(categoryLanding){renderCategoryLanding();return;}
   const visible=dishes.filter(dish=>selectedCategory==="all" || groupId(dish)===selectedCategory);
   if(!visible.length){$("menu").textContent="მენიუ ჯერ არ არის დამატებული";return;}
   const groups=new Map();
