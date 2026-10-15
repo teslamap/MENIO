@@ -27,7 +27,18 @@ export function mountCouriers(root, store) {
    const activeLabel=document.createElement('label');activeLabel.className='courier-active-label';const activeInput=document.createElement('input');activeInput.type='checkbox';activeInput.checked=a.profile.active===true;activeLabel.append(activeInput,text('span','აქტიური — შეუძლია შეკვეთების მიღება'));form.append(activeLabel);
    const hint=text('p','ელფოსტა აქ იცვლება საკონტაქტო მონაცემებში; Firebase Auth-ის შესვლის ელფოსტა უცვლელი რჩება.','courier-edit-hint');form.append(hint);
    const save=text('button','ცვლილებების შენახვა');save.type='submit';save.disabled=busy;form.append(save);
-   form.onsubmit=async event=>{event.preventDefault();if(busy)return;const data={name:controls.name.value.trim(),phone:controls.phone.value.trim(),email:controls.email.value.trim(),city:controls.city.value.trim(),plate:controls.plate.value.trim(),vehicle:vehicleSelect.value,active:activeInput.checked};if(!/^\\+9955[0-9]{8}$/.test(data.phone)){$('courierStatus').textContent='ტელეფონის ფორმატი: +9955XXXXXXXX';return;}if((data.vehicle==='car'||data.vehicle==='scooter')&&!data.plate){$('courierStatus').textContent='ამ ტრანსპორტისთვის სახელმწიფო ნომერი სავალდებულოა.';return;}busy=true;save.disabled=true;$('courierStatus').textContent='ინახება…';try{await store.saveProfile(a.id,data);await load();$('courierStatus').textContent='კურიერის მონაცემები შენახულია ✓';}catch(error){$('courierStatus').textContent='შენახვა ვერ მოხერხდა: '+error.message;}finally{busy=false;save.disabled=false;}};
+   const feedback=text('p','','courier-form-feedback');feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');form.insertBefore(feedback,save);
+   const report=message=>{feedback.textContent=message;$('courierStatus').textContent=message;};
+   form.onsubmit=async event=>{
+     event.preventDefault();if(busy)return;
+     const data={name:controls.name.value.trim(),phone:controls.phone.value.replace(/[\\s()\\-]/g,''),email:controls.email.value.trim(),city:controls.city.value.trim(),plate:controls.plate.value.trim(),vehicle:vehicleSelect.value,active:activeInput.checked};
+     if(!/^[+]9955[0-9]{8}$/.test(data.phone)){report('ტელეფონის ფორმატი: +9955XXXXXXXX');return;}
+     if((data.vehicle==='car'||data.vehicle==='scooter')&&!data.plate){report('ამ ტრანსპორტისთვის სახელმწიფო ნომერი სავალდებულოა.');return;}
+     busy=true;save.disabled=true;report('ინახება…');
+     try{await store.saveProfile(a.id,data);report('კურიერის მონაცემები შენახულია ✓');await load();$('courierStatus').textContent='კურიერის მონაცემები შენახულია ✓';}
+     catch(error){report('შენახვა ვერ მოხერხდა: '+(error.message||'უცნობი შეცდომა'));}
+     finally{busy=false;save.disabled=false;}
+   };
    detail.append(form);
   }
   if(a.status!=='pending')return;
