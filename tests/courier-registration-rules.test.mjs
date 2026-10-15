@@ -1,0 +1,25 @@
+import {before,after,beforeEach,test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
+import {doc,setDoc,getDoc,getDocs,updateDoc,collection,serverTimestamp,Timestamp,writeBatch} from 'firebase/firestore';
+let env;
+const db=(uid='applicant')=>env.authenticatedContext(uid,{email:uid+'@example.com',firebase:{sign_in_provider:'password'}}).firestore();
+const application=(extra={})=>({uid:'applicant',name:'Test Courier',email:'applicant@example.com',phone:'+995555123456',city:'თბილისი',vehicle:'bicycle',plate:'',status:'pending',createdAt:serverTimestamp(),...extra});
+const appRef=(store,id='applicant')=>doc(store,'courierApplications',id);
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-menio',firestore:{host:'127.0.0.1',port:8080,rules:fs.readFileSync(process.env.RULES_FILE || new URL('../firestore.rules',import.meta.url),'utf8')}});});
+after(async()=>{await env?.cleanup();});
+beforeEach(async()=>{await env.clearFirestore();await env.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),'platformAdmins/admin'),{role:'superadmin'});});});
+async function seed(){await assertSucceeds(setDoc(appRef(db()),application()));}
+function approve(store,extra={},reviewExtra={}){const batch=writeBatch(store);batch.update(appRef(store),{status:'approved',reviewedAt:serverTimestamp(),reviewedBy:'admin',rejectionReason:'',...reviewExtra});batch.set(doc(store,'courierProfiles/applicant'),{name:'Test Courier',email:'applicant@example.com',phone:'+995555123456',city:'თბილისი',vehicle:'bicycle',plate:'',role:'courier',active:true,createdAt:serverTimestamp(),approvedBy:'admin',...extra});return batch.commit();}
+test('owner creates pending request, reads it, cannot list others',async()=>{await seed();await assertSucceeds(getDoc(appRef(db())));await assertFails(getDocs(collection(db(),'courierApplications')));await assertFails(getDoc(appRef(db('other'))));await assertSucceeds(getDocs(collection(db('admin'),'courierApplications')));});
+test('unauthenticated and anonymous requests denied',async()=>{await assertFails(setDoc(appRef(env.unauthenticatedContext().firestore()),application()));const anon=env.authenticatedContext('applicant',{firebase:{sign_in_provider:'anonymous'}}).firestore();await assertFails(setDoc(appRef(anon),application()));});
+test('rejects forged UID, email, status and privilege fields',async()=>{for(const extra of [{uid:'other'},{email:'other@example.com'},{status:'approved'},{active:true},{role:'superadmin'},{password:'never-store'}])await assertFails(setDoc(appRef(db()),application(extra)));});
+test('rejects invalid schema, old timestamp and missing motor plate',async()=>{for(const extra of [{phone:'123'},{vehicle:'plane'},{city:''},{city:'x'.repeat(81)},{createdAt:Timestamp.fromMillis(1)},{vehicle:'car',plate:''},{name:'x'.repeat(122)}])await assertFails(setDoc(appRef(db()),application(extra)));});
+test('applicant cannot overwrite, self-approve or create active profile',async()=>{await seed();await assertFails(setDoc(appRef(db()),application()));await assertFails(updateDoc(appRef(db()),{status:'approved'}));await assertFails(setDoc(doc(db(),'courierProfiles/applicant'),{role:'courier',active:true}));});
+test('admin atomically approves matching profile; owner reads profile',async()=>{await seed();await assertSucceeds(approve(db('admin')));const snap=await assertSucceeds(getDoc(doc(db(),'courierProfiles/applicant')));assert.equal(snap.data().active,true);assert.equal((await getDoc(appRef(db()))).data().status,'approved');});
+test('approval requires matching profile in same atomic operation',async()=>{await seed();await assertFails(updateDoc(appRef(db('admin')),{status:'approved',reviewedAt:serverTimestamp(),reviewedBy:'admin',rejectionReason:''}));await assertFails(approve(db('admin'),{phone:'+995555000000'}));await assertFails(approve(db('admin'),{role:'superadmin'}));await assertFails(approve(db('admin'),{secret:'injected'}));});
+test('nonadmins cannot approve and admins cannot alter application data',async()=>{await seed();await assertFails(approve(db()));await assertFails(approve(db('admin'),{},{phone:'+995555000000'}));});
+test('rejection requires reason and does not create profile',async()=>{await seed();const ref=appRef(db('admin'));await assertFails(updateDoc(ref,{status:'rejected',reviewedAt:serverTimestamp(),reviewedBy:'admin',rejectionReason:''}));await assertSucceeds(updateDoc(ref,{status:'rejected',reviewedAt:serverTimestamp(),reviewedBy:'admin',rejectionReason:'Please contact us'}));assert.equal((await getDoc(doc(db(),'courierProfiles/applicant'))).exists(),false);await assertFails(approve(db('admin')));});
+test('a reviewed application cannot be reopened or reviewed twice',async()=>{await seed();await assertSucceeds(approve(db('admin')));await assertFails(updateDoc(appRef(db('admin')),{status:'pending'}));await assertFails(approve(db('admin')));await assertFails(updateDoc(doc(db(),'courierProfiles/applicant'),{active:true,role:'superadmin'}));});
+

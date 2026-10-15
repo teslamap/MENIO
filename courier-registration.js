@@ -1,0 +1,22 @@
+import {submitCourierApplication} from './courier-registration-service.js';
+
+const $=id=>document.getElementById(id),form=$('registration');
+function conditional(){const other=$('city').value==='other',motor=['car','scooter'].includes($('vehicle').value);for(const [field,input,active]of [['otherCityField','otherCity',other],['plateField','plate',motor]]){$(field).hidden=!active;$(input).disabled=!active;$(input).required=active;}}
+$('city').addEventListener('change',conditional);$('vehicle').addEventListener('change',conditional);
+function validate(){for(const id of ['firstName','lastName','otherCity','plate']){const el=$(id);el.setCustomValidity(!el.disabled&&el.required&&!el.value.trim()?'შეავსე ეს ველი.':'');}const phone=$('phone').value.replace(/[\s()\-]/g,'');$('phone').setCustomValidity(/^(?:\+?995)?5\d{8}$/.test(phone)?'':'შეიყვანე ქართული მობილურის ნომერი: +995 5XX XX XX XX.');$('confirm').setCustomValidity($('confirm').value===$('password').value?'':'პაროლები ერთმანეთს არ ემთხვევა.');return form.checkValidity();}
+form.addEventListener('input',()=>{for(const el of form.querySelectorAll('input'))el.setCustomValidity('');$('error').textContent='';});
+document.querySelectorAll('.show').forEach(b=>b.onclick=()=>{const input=$(b.dataset.for),show=input.type==='password';input.type=show?'text':'password';b.textContent=show?'დამალვა':'ჩვენება';b.setAttribute('aria-pressed',String(show));});
+form.addEventListener('submit',e=>{e.preventDefault();if(!validate()){form.reportValidity();$('error').textContent='გადაამოწმე მონიშნული ველები.';return;}const raw=$('phone').value.replace(/\D/g,''),phone='+995'+raw.slice(-9);const rows=[['სახელი და გვარი',$('firstName').value.trim()+' '+$('lastName').value.trim()],['ტელეფონი',phone],['ელფოსტა',$('email').value.trim()],['ქალაქი',$('city').value==='other'?$('otherCity').value.trim():$('city').value],['ტრანსპორტი',$('vehicle').selectedOptions[0].textContent]];if(!$('plate').disabled)rows.push(['სახელმწიფო ნომერი',$('plate').value.trim().toUpperCase()]);$('summary').replaceChildren();for(const [label,value]of rows){const row=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;row.append(dt,dd);$('summary').append(row);}form.hidden=true;$('review').hidden=false;$('review').focus();});
+$('edit').onclick=()=>{$('review').hidden=true;form.hidden=false;$('firstName').focus();};
+$('send').onclick=async()=>{
+const button=$('send');if(button.disabled)return;button.disabled=true;$('edit').disabled=true;$('reviewError').textContent='იგზავნება…';
+try{
+const status=await submitCourierApplication({name:$('firstName').value.trim()+' '+$('lastName').value.trim(),email:$('email').value,phone:'+995'+$('phone').value.replace(/\D/g,'').slice(-9),city:$('city').value==='other'?$('otherCity').value:$('city').value,vehicle:$('vehicle').value,plate:$('plate').disabled?'':$('plate').value.trim().toUpperCase()},$('password').value);
+$('review').hidden=true;$('done').hidden=false;$('password').value='';$('confirm').value='';
+$('applicationResult').textContent=({pending:'განაცხადი მიღებულია. სუპერადმინის დადასტურებამდე შეკვეთებზე წვდომა შეზღუდულია.',approved:'შენი განაცხადი უკვე დამტკიცებულია. შეგიძლია გახსნა კურიერის პანელი.',rejected:'შენი განაცხადი უარყოფილია. დამატებითი ინფორმაციისთვის დაუკავშირდი ORDERA-ს ადმინისტრატორს.'})[status]||'განაცხადის სტატუსი შენახულია.';
+$('done').focus();
+}catch(error){$('reviewError').textContent=({'auth/invalid-credential':'ეს ელფოსტა უკვე გამოიყენება ან პაროლი არასწორია. შეამოწმე მონაცემები.','auth/weak-password':'პაროლი უნდა შეიცავდეს მინიმუმ 8 სიმბოლოს.','auth/network-request-failed':'კავშირი ვერ დამყარდა. სცადე ხელახლა.','auth/too-many-requests':'ძალიან ბევრი მცდელობაა. სცადე მოგვიანებით.','permission-denied':'ანგარიშში შესვლა შესრულდა, მაგრამ განაცხადის შენახვა ვერ მოხერხდა. სცადე ხელახლა ცოტა ხანში.','unavailable':'სერვერი დროებით მიუწვდომელია. იგივე ელფოსტითა და პაროლით ხელახლა ცდა შეგიძლია.'})[error.code]||'რეგისტრაცია ვერ დასრულდა. შეამოწმე მონაცემები და სცადე ხელახლა.';
+}finally{button.disabled=false;$('edit').disabled=false;}
+};
+$('restart').onclick=()=>{form.reset();conditional();for(const b of document.querySelectorAll('.show')){$(b.dataset.for).type='password';b.textContent='ჩვენება';b.setAttribute('aria-pressed','false');}$('summary').replaceChildren();$('done').hidden=true;form.hidden=false;$('firstName').focus();};
+conditional();

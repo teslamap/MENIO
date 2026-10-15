@@ -120,15 +120,70 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    match /courierProfiles/{uid} {
-      // Couriers can read only their own profile. Platform admins manage profiles through trusted admin tooling.
+    // Private applications are keyed by Firebase Auth UID; review metadata is admin-only.
+    function validCourierApplication(data, uid) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'phone', 'city', 'vehicle', 'plate', 'status', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'city', 'vehicle', 'plate', 'status', 'createdAt', 'reviewedAt', 'reviewedBy', 'rejectionReason'])
+        && data.uid == uid
+        && data.name is string && data.name.size() >= 3 && data.name.size() <= 121
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.phone is string && data.phone.matches('^[+]9955[0-9]{8}$')
+        && data.city is string && data.city.size() > 0 && data.city.size() <= 80
+        && data.vehicle in ['bicycle', 'ebike', 'scooter', 'car', 'walking']
+        && data.plate is string && data.plate.size() <= 20
+        && (!(data.vehicle in ['car', 'scooter']) || data.plate.size() > 0)
+        && data.status in ['pending', 'approved', 'rejected']
+        && data.createdAt is timestamp;
+    }
+    function approvedCourierMatches(uid, data) {
+      let application = getAfter(/databases/$(database)/documents/courierApplications/$(uid)).data;
+      return data.keys().hasAll(['name', 'phone', 'email', 'city', 'vehicle', 'plate', 'role', 'active', 'createdAt', 'approvedBy'])
+        && data.keys().hasOnly(['name', 'phone', 'email', 'city', 'vehicle', 'plate', 'role', 'active', 'createdAt', 'approvedBy'])
+        && application.status == 'approved'
+        && application.reviewedAt == request.time
+        && application.reviewedBy == request.auth.uid
+        && data.name == application.name && data.phone == application.phone
+        && data.email == application.email && data.city == application.city
+        && data.vehicle == application.vehicle && data.plate == application.plate
+        && data.role == 'courier' && data.active == true
+        && data.createdAt == request.time && data.approvedBy == request.auth.uid;
+    }
+    match /courierApplications/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
-      allow list, create, update, delete: if false;
+      allow list: if isPlatformAdmin();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && validCourierApplication(request.resource.data, uid)
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'city', 'vehicle', 'plate', 'status', 'createdAt'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+      allow update: if isPlatformAdmin()
+        && validCourierApplication(request.resource.data, uid)
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt', 'reviewedBy', 'rejectionReason'])
+        && request.resource.data.reviewedAt == request.time
+        && request.resource.data.reviewedBy == request.auth.uid
+        && request.resource.data.rejectionReason is string
+        && request.resource.data.rejectionReason.size() <= 500
+        && ((request.resource.data.status == 'rejected' && request.resource.data.rejectionReason.size() > 0)
+          || (request.resource.data.status == 'approved'
+            && request.resource.data.rejectionReason == ''
+            && approvedCourierMatches(uid, getAfter(/databases/$(database)/documents/courierProfiles/$(uid)).data)));
+      allow delete: if false;
+    }
+    match /courierProfiles/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
+      allow create: if isPlatformAdmin()
+        && get(/databases/$(database)/documents/courierApplications/$(uid)).data.status == 'pending'
+        && approvedCourierMatches(uid, request.resource.data);
+      allow list, update, delete: if false;
     }
 
     match /orders/{orderId} {
       allow create: if signedIn()
         && request.resource.data.keys().hasAll(['restaurantSlug', 'tableNumber', 'tableId', 'items', 'total', 'status', 'paymentStatus', 'createdAt'])
+        && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.restaurantSlug is string
         && request.resource.data.tableNumber is int
         && request.resource.data.tableId is string
