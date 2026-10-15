@@ -1,4 +1,4 @@
-import {mountCouriers} from './courier-admin.js';
+import {mountCouriers} from './courier-admin.js?v=20261015-save-2';
 import {courierStore} from './courier-store.js';
 import {auth,db,signInWithEmailAndPassword,onAuthStateChanged,signOut,collection,getDocs,doc,getDoc,setDoc,serverTimestamp} from "./firebase.js";
 import {isPlatformAdmin} from "./app.js";
