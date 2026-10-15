@@ -22,6 +22,20 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/courierProfiles/$(request.auth.uid)).data.active == true;
     }
 
+    match /platformSettings/{settingId} {
+      allow read: if settingId == 'deliveryPricing';
+      allow create, update: if settingId == 'deliveryPricing' && isPlatformAdmin()
+        && request.resource.data.keys().hasAll(['restaurantToCustomerPerKm', 'courierToRestaurantPerKm', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['restaurantToCustomerPerKm', 'courierToRestaurantPerKm', 'updatedAt', 'updatedBy'])
+        && request.resource.data.restaurantToCustomerPerKm is number
+        && request.resource.data.restaurantToCustomerPerKm >= 0 && request.resource.data.restaurantToCustomerPerKm <= 1000
+        && request.resource.data.courierToRestaurantPerKm is number
+        && request.resource.data.courierToRestaurantPerKm >= 0 && request.resource.data.courierToRestaurantPerKm <= 1000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
     match /platformAdmins/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update, delete: if false;
