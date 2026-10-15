@@ -73,6 +73,8 @@ if($("loginForm")) $("loginForm").addEventListener("submit",async event=>{
   try {
     await authReady;
     const credential=await signInWithEmailAndPassword(auth,$("loginEmail").value.trim(),$("loginPassword").value);
+    const returnTo=new URLSearchParams(location.search).get("returnTo");
+    if(returnTo==="courier"){location.href="courier.html";return;}
     const owners=await getDocs(query(collection(db,"restaurantOwners"),where("ownerUid","==",credential.user.uid)));
     if(owners.empty) {
       $("email").value=credential.user.email || "";
@@ -84,7 +86,6 @@ if($("loginForm")) $("loginForm").addEventListener("submit",async event=>{
       $("restaurantName").focus();
       return;
     }
-    const returnTo=new URLSearchParams(location.search).get("returnTo");
     const requestedRestaurant=new URLSearchParams(location.search).get("restaurant");
     const merchantReturn=returnTo==="merchant";
     if(owners.size===1) {
