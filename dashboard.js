@@ -191,6 +191,23 @@ function qrData(url) {
 function renderTables() {
   const active = [...tables.values()].filter(t => t.active).sort((a,b) => a.number-b.number);
   $("tableCount").textContent = active.length; $("tableList").replaceChildren();
+  const serviceRoot=$("serviceQrList");serviceRoot.replaceChildren();
+  for(const mode of [
+    {key:"takeaway",title:"🥡 წასაღები შეკვეთა",description:"სტუმარი ირჩევს კერძებს და თავად მოდის წასაღებად."},
+    {key:"delivery",title:"🚚 მიტანის შეკვეთა",description:"სტუმარი უთითებს მისამართსა და ტელეფონს; მზა შეკვეთას კურიერი აიღებს."}
+  ]){
+    const card=element("article",undefined,"table-card");
+    card.append(element("h3",mode.title),element("p",mode.description));
+    const url=new URL("menu.html",location.href);url.searchParams.set("restaurant",slug);url.searchParams.set("orderType",mode.key);
+    let data;
+    try{data=qrData(url.href);const image=element("img",undefined,"qr");image.src=data;image.alt="QR — "+mode.title;card.append(image)}
+    catch(error){card.append(element("p",error.message))}
+    const open=element("a","ბმულის გახსნა ↗");open.href=url.href;open.target="_blank";open.rel="noopener";card.append(open);
+    const actions=element("div",undefined,"actions compact");
+    actions.append(action("ბმულის კოპირება",async()=>{try{await navigator.clipboard.writeText(url.href);say("ბმული კოპირებულია.")}catch{await promptDialog("ბმული მზადაა დასაკოპირებლად:",url.href)}}));
+    if(data){const download=element("a","QR ჩამოტვირთვა","btn secondary small-button");download.href=data;download.download=slug+"-"+mode.key+"-qr.png";actions.append(download)}
+    card.append(actions);serviceRoot.append(card);
+  }
   if (!active.length) $("tableList").append(element("p", "დაამატე პირველი მაგიდა.", "muted"));
   for (const table of active) {
     const card = element("article", undefined, "table-card");
