@@ -138,6 +138,11 @@ service cloud.firestore {
         && request.resource.data.total > 0
         && request.resource.data.status == 'new'
         && request.resource.data.paymentStatus == 'unpaid'
+        && !('deliveryStatus' in request.resource.data)
+        && !('courierUid' in request.resource.data)
+        && !('courierAssignedAt' in request.resource.data)
+        && !('courierPickedUpAt' in request.resource.data)
+        && !('deliveredAt' in request.resource.data)
         && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug))
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)).data.active == true
         && (
@@ -189,6 +194,7 @@ service cloud.firestore {
       // A shared courier can atomically claim an unclaimed delivery order, then advance only their own delivery.
       allow update: if isActiveCourier()
         && resource.data.orderType == 'delivery'
+        && resource.data.status == 'completed'
         && request.resource.data.restaurantSlug == resource.data.restaurantSlug
         && request.resource.data.items == resource.data.items
         && request.resource.data.total == resource.data.total
