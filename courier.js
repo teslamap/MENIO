@@ -1,16 +1,20 @@
 import{auth,db,doc,getDoc,collection,query,where,onSnapshot,updateDoc,serverTimestamp,onAuthStateChanged,signOut}from"./courier-firebase.js";
 import{showToast}from"./ui.js?v=20261014-ui-1";
-import {mountCourierMap,navigationUrl} from './courier-map.js?v=20261015-1';
+import {mountCourierMap,navigationUrl} from './courier-map.js?v=20261015-pickup-2';
 const $=id=>document.getElementById(id);
 const mapUI=mountCourierMap();
-let profile=null,unsubscribe=null;
+let profile=null,unsubscribe=null,latestSnapshot=null;
+const restaurantRecords=new Map(),restaurantSubscriptions=new Map();
+function clearRestaurants(){for(const stop of restaurantSubscriptions.values())stop();restaurantSubscriptions.clear();restaurantRecords.clear();latestSnapshot=null;}
+function syncRestaurants(orders){if(!mapUI)return;const slugs=new Set(orders.map(o=>o.restaurantSlug).filter(s=>typeof s==='string'&&s.length>0&&!s.includes('/')));for(const [slug,stop]of restaurantSubscriptions)if(!slugs.has(slug)){stop();restaurantSubscriptions.delete(slug);restaurantRecords.delete(slug);}for(const slug of slugs){if(restaurantSubscriptions.has(slug))continue;restaurantSubscriptions.set(slug,()=>{});const stop=onSnapshot(doc(db,'restaurants',slug),snap=>{restaurantRecords.set(slug,snap.exists()?snap.data():null);if(latestSnapshot)render(latestSnapshot);},()=>{restaurantRecords.set(slug,null);});restaurantSubscriptions.set(slug,stop);}}
 const esc=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 const money=value=>Number(value||0).toFixed(2)+" ₾";
 function setStatus(text){$("status").textContent=text}
 function render(snapshot){
+ latestSnapshot=snapshot;
  const root=$("courierOrders");root.replaceChildren();
- const orders=snapshot.docs.map(d=>({...d.data(),id:d.id})).filter(o=>o.orderType==="delivery"&&(["waiting","assigned","picked_up"].includes(o.deliveryStatus)||o.courierUid===auth.currentUser?.uid)).sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
- mapUI?.updateOrders(orders);
+ const orders=snapshot.docs.map(d=>{const o={...d.data(),id:d.id},r=restaurantRecords.get(o.restaurantSlug);return {...o,restaurantName:r?.name||o.restaurantName,restaurantLocation:r?.restaurantLocation||null,restaurantAddress:r?.restaurantAddress||''};}).filter(o=>o.orderType==="delivery"&&(["waiting","assigned","picked_up"].includes(o.deliveryStatus)||o.courierUid===auth.currentUser?.uid)).sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+ syncRestaurants(orders);mapUI?.updateOrders(orders);
  if(!orders.length){const empty=document.createElement("div");empty.className="empty";empty.textContent="ამ ეტაპზე მისაღები მიტანის შეკვეთა არ არის. ახალი შეკვეთა აქ ავტომატურად გამოჩნდება.";root.append(empty);return}
  for(const o of orders){
   const card=document.createElement("article");card.className="courier-order";card.id='courier-order-'+o.id;
@@ -18,7 +22,8 @@ function render(snapshot){
   const h=document.createElement("h2");h.textContent=(o.restaurantName||o.restaurantSlug||"რესტორანი")+" · №"+String(o.id).slice(-6).toUpperCase();
   const tag=document.createElement("span");tag.className="courier-tag";tag.textContent=({waiting:"კურიერს ელოდება",assigned:"ჩემთანაა",picked_up:"მიტანის პროცესში",delivered:"ჩაბარებულია"})[o.deliveryStatus]||"მიტანა";
   title.append(h,tag);card.append(title);
-  if(mapUI){const mapButton=document.createElement('button');mapButton.type='button';mapButton.className='order-map-button';mapButton.textContent='რუკაზე ნახვა ⌖';mapButton.onclick=()=>mapUI.focusOrder(o.id);card.append(mapButton);const url=navigationUrl(o);if(url){const link=document.createElement('a');link.className='btn secondary order-map-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='ნავიგაცია ↗';card.append(link);}}
+  if(mapUI){const mapButton=document.createElement('button');mapButton.type='button';mapButton.className='order-map-button';mapButton.textContent='რუკაზე ნახვა ⌖';mapButton.onclick=()=>mapUI.focusOrder(o.id);card.append(mapButton);const pickup=o.restaurantLocation;if(pickup){const link=document.createElement('a');link.className='btn secondary order-map-button';link.href=navigationUrl({},[pickup.latitude,pickup.longitude]);link.target='_blank';link.rel='noopener noreferrer';link.textContent='რესტორანთან მისვლა ↗';card.append(link);}const url=navigationUrl(o);if(url){const link=document.createElement('a');link.className='btn secondary order-map-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='ნავიგაცია ↗';card.append(link);}}
+  if(o.restaurantAddress){const pickupAddress=document.createElement("p");pickupAddress.textContent="აღების ადგილი: "+o.restaurantAddress;card.append(pickupAddress);}
   const address=document.createElement("p");address.innerHTML="<strong>მისამართი:</strong> "+esc(o.deliveryAddress||"მისამართი არ არის მითითებული");card.append(address);
   const phone=document.createElement("p");phone.innerHTML="<strong>ტელეფონი:</strong> "+(o.customerPhone?'<a href="tel:'+esc(o.customerPhone)+'">'+esc(o.customerPhone)+'</a>':"არ არის მითითებული");card.append(phone);
   const items=document.createElement("div");items.className="items";
@@ -46,7 +51,7 @@ async function change(order,data,button){
  catch(e){showToast("ვერ განახლდა: "+e.message,"error")}
  finally{button.disabled=false;button.textContent=old}
 }
-$("logout").onclick=async()=>{unsubscribe?.();await signOut(auth);location.href="courier-login.html"};
+$("logout").onclick=async()=>{unsubscribe?.();clearRestaurants();await signOut(auth);location.href="courier-login.html"};
 onAuthStateChanged(auth,async user=>{
  unsubscribe?.();
  if(!user||user.isAnonymous){location.href="courier-login.html";return}
@@ -58,4 +63,4 @@ onAuthStateChanged(auth,async user=>{
   unsubscribe=onSnapshot(q,render,error=>setStatus("შეკვეთების ჩატვირთვა ვერ მოხერხდა: "+error.message));
  }catch(e){setStatus("წვდომა ვერ დადასტურდა: "+e.message)}
 });
-window.addEventListener("pagehide",()=>unsubscribe?.());
+window.addEventListener("pagehide",()=>{unsubscribe?.();clearRestaurants();});

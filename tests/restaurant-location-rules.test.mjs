@@ -1,0 +1,18 @@
+import {before,after,beforeEach,test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
+import {doc,setDoc,getDoc,updateDoc,deleteField} from 'firebase/firestore';
+let env;
+const db=uid=>env.authenticatedContext(uid).firestore();
+const ref=uid=>doc(db(uid),'restaurants/alpha');
+const point={latitude:41.715,longitude:44.827};
+before(async()=>{env=await initializeTestEnvironment({projectId:'demo-menio',firestore:{host:'127.0.0.1',port:8080,rules:fs.readFileSync(process.env.RULES_FILE||new URL('../firestore.rules',import.meta.url),'utf8')}});});
+after(async()=>env?.cleanup());
+beforeEach(async()=>{await env.clearFirestore();await env.withSecurityRulesDisabled(async c=>{const db=c.firestore();await setDoc(doc(db,'restaurants/alpha'),{slug:'alpha',name:'Test restaurant',active:true,tableCount:1,nextTableNumber:2});await setDoc(doc(db,'restaurantOwners/alpha'),{ownerUid:'owner'});await setDoc(doc(db,'platformAdmins/admin'),{role:'superadmin'});});});
+test('owner saves coordinates and restaurant address, courier can read them',async()=>{await assertSucceeds(updateDoc(ref('owner'),{restaurantLocation:point,restaurantAddress:'Restaurant entrance'}));const snap=await assertSucceeds(getDoc(ref('courier')));assert.deepEqual(snap.data().restaurantLocation,point);});
+test('superadmin can update restaurant location',async()=>{await assertSucceeds(updateDoc(ref('admin'),{restaurantLocation:point,restaurantAddress:''}));});
+test('other user and signed-out visitor cannot change coordinates',async()=>{await assertFails(updateDoc(ref('other'),{restaurantLocation:point}));await assertFails(updateDoc(doc(env.unauthenticatedContext().firestore(),'restaurants/alpha'),{restaurantLocation:point}));});
+test('invalid coordinate types, ranges and extra fields are denied',async()=>{for(const location of [null,{latitude:91,longitude:44},{latitude:41,longitude:181},{latitude:'41',longitude:44},{latitude:41},{...point,active:true}])await assertFails(updateDoc(ref('owner'),{restaurantLocation:location}));await assertFails(updateDoc(ref('owner'),{restaurantAddress:'x'.repeat(301)}));});
+test('location update cannot change ownership or immutable slug',async()=>{await assertFails(updateDoc(ref('owner'),{restaurantLocation:point,ownerUid:'other'}));await assertFails(updateDoc(ref('owner'),{restaurantLocation:point,slug:'beta'}));});
+test('existing restaurant settings still update with and without saved location',async()=>{await assertSucceeds(updateDoc(ref('owner'),{themeColor:'#ff0000'}));await assertSucceeds(updateDoc(ref('owner'),{restaurantLocation:point}));await assertSucceeds(updateDoc(ref('owner'),{name:'New name'}));await assertSucceeds(updateDoc(ref('owner'),{restaurantLocation:deleteField()}));});

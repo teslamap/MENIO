@@ -1,3 +1,4 @@
+import {mountRestaurantSettings} from './restaurant-settings.js?v=20261015-1';
 import {
   auth, db, doc, getDoc, collection, setDoc, updateDoc, deleteDoc, writeBatch,
   onSnapshot, runTransaction, serverTimestamp, onAuthStateChanged, signOut
@@ -436,6 +437,7 @@ onAuthStateChanged(auth,async user => {
   try {
     if (!slug) throw Error("რესტორანი არ არის არჩეული. შედი ანგარიშში ხელახლა.");
     const restaurant=await requireOwner(slug);
+    mountRestaurantSettings(slug,restaurant);
     $("restaurantInfo").textContent=restaurant.name;
     renderTheme(restaurant.themeColor || DEFAULT_THEME_COLOR);if(restaurant.restaurantLogo){$("restaurantLogoPreview").src=restaurant.restaurantLogo;$("restaurantLogoPreview").hidden=false;$("logoPreviewPlaceholder").hidden=true;}
     $("merchantLink").href="merchant.html?restaurant="+encodeURIComponent(slug);

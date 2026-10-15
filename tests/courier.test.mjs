@@ -9,25 +9,25 @@ class Element {
   replaceChildren(...children){this.children=children;}
   get childElementCount(){return this.children.length;}
 }
-async function setup({user={uid:'courier-a'},profile={role:'courier',active:true},failWrite=false}={}){
+async function setup({user={uid:'courier-a'},profile={role:'courier',active:true},failWrite=false,withMap=false}={}){
   const nodes=new Map(['status','courierOrders','logout'].map(id=>[id,new Element()]));
-  const queries=[],writes=[],toasts=[];let listener;
+  const queries=[],writes=[],toasts=[],mapOrders=[],restaurantListeners=new Map();let listener;
   const context={
     auth:{currentUser:user},db:{},location:{href:''},
     document:{getElementById:id=>nodes.get(id),createElement:()=>new Element()},
     window:{addEventListener(){}},
     doc:(_db,...parts)=>parts.join('/'),getDoc:async()=>({exists:()=>!!profile,data:()=>profile}),
     collection:(_db,name)=>name,where:(...args)=>args,query:(...args)=>args,
-    onSnapshot:(query,fn)=>{queries.push(query);listener=fn;return ()=>{};},
+    onSnapshot:(query,fn)=>{if(typeof query==='string'){restaurantListeners.set(query,fn);return ()=>restaurantListeners.delete(query);}queries.push(query);listener=fn;return ()=>{};},
     onAuthStateChanged:(_auth,fn)=>{queueMicrotask(()=>fn(user));},
     updateDoc:async(path,data)=>{if(failWrite)throw Error('permission-denied');writes.push({path,data});},
     serverTimestamp:()=> 'SERVER_TIMESTAMP',signOut:async()=>{},
-    mountCourierMap:()=>null,navigationUrl:()=>null,showToast:(...args)=>toasts.push(args)
+    mountCourierMap:()=>withMap?{updateOrders:orders=>mapOrders.push(orders),focusOrder(){}}:null,navigationUrl:()=>null,showToast:(...args)=>toasts.push(args)
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(new URL('../courier.js',import.meta.url),'utf8').replace(/^import.*;\r?\n/gm,''),context);
   await new Promise(resolve=>setImmediate(resolve));
-  return {context,nodes,queries,writes,toasts,publish:orders=>listener({docs:orders.map(o=>({id:o.id,data:()=>o}))})};
+  return {context,nodes,queries,writes,toasts,mapOrders,restaurantListeners,publishRestaurant:(slug,data)=>restaurantListeners.get('restaurants/'+slug)({exists:()=>!!data,data:()=>data}),publish:orders=>listener({docs:orders.map(o=>({id:o.id,data:()=>o}))})};
 }
 test('signed-out and anonymous couriers are redirected without subscribing',async()=>{
   for(const user of [null,{uid:'guest',isAnonymous:true}]){
@@ -66,3 +66,5 @@ test('denied claim reports the failure and re-enables the button',async()=>{
   const button=h.nodes.get('courierOrders').children[0].children.at(-1).children[0];
   await button.onclick();assert.equal(button.disabled,false);assert.equal(h.writes.length,0);assert.equal(h.toasts.at(-1)[1],'error');
 });
+
+test('courier map uses saved restaurant coordinates and updates existing orders',async()=>{const h=await setup({withMap:true});h.publish([{id:'order',restaurantSlug:'alpha',orderType:'delivery',deliveryStatus:'waiting',items:[],restaurantLocation:{latitude:0,longitude:0}}]);assert.equal(h.restaurantListeners.size,1);assert.equal(h.mapOrders.at(-1)[0].restaurantLocation,null);h.publishRestaurant('alpha',{name:'Restaurant',restaurantLocation:{latitude:41,longitude:44},restaurantAddress:'Entrance'});assert.equal(h.mapOrders.at(-1)[0].restaurantName,'Restaurant');assert.equal(h.mapOrders.at(-1)[0].restaurantLocation.latitude,41);h.publishRestaurant('alpha',{name:'Restaurant',restaurantLocation:{latitude:42,longitude:45}});assert.equal(h.mapOrders.at(-1)[0].restaurantLocation.latitude,42);h.publish([]);assert.equal(h.restaurantListeners.size,0);assert.equal(h.mapOrders.at(-1).length,0);});
