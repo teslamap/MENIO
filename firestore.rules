@@ -223,7 +223,22 @@ service cloud.firestore {
       allow create: if isPlatformAdmin()
         && get(/databases/$(database)/documents/courierApplications/$(uid)).data.status == 'pending'
         && approvedCourierMatches(uid, request.resource.data);
-      allow list, update, delete: if false;
+      allow list: if isPlatformAdmin();
+      allow update: if isPlatformAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','email','city','vehicle','plate','active'])
+        && request.resource.data.role == 'courier'
+        && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 121
+        && request.resource.data.phone is string && request.resource.data.phone.matches('^[+]9955[0-9]{8}
+    }
+
+    )
+        && request.resource.data.email is string && request.resource.data.email.size() >= 3 && request.resource.data.email.size() <= 254
+        && request.resource.data.city is string && request.resource.data.city.size() > 0 && request.resource.data.city.size() <= 80
+        && request.resource.data.vehicle in ['bicycle','ebike','scooter','car','walking']
+        && request.resource.data.plate is string && request.resource.data.plate.size() <= 20
+        && (!(request.resource.data.vehicle in ['car','scooter']) || request.resource.data.plate.size() > 0)
+        && request.resource.data.active is bool;
+      allow delete: if false;
     }
 
     function validDeliveryLocation(data) {
