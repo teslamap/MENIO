@@ -1,15 +1,13 @@
 import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAnonymously,onAuthStateChanged,query,where} from "./firebase.js";
 import { safeProductImage } from "./image-utils.js";
-const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table"));
+const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table")),requestedType=params.get("orderType"),orderType=["takeaway","delivery"].includes(requestedType)?requestedType:"table",noTable=orderType!=="table";
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", categoryLanding=true, sending=false, ready=false, ordersUnsubscribe=null;
 let detailId=null;
 // The restaurant logo returns to this table's category landing, never to the public index.
 const restaurantBrand=$("restaurantBrandLogo")?.closest("a.menu-brand");
 if(restaurantBrand){
-  restaurantBrand.href=slug && Number.isSafeInteger(table) && table>0
-    ? `menu.html?restaurant=${encodeURIComponent(slug)}&table=${table}`
-    : "menu.html";
+  restaurantBrand.href=slug ? (noTable?`menu.html?restaurant=${encodeURIComponent(slug)}&orderType=${orderType}`:`menu.html?restaurant=${encodeURIComponent(slug)}&table=${table}`) : "menu.html";
   restaurantBrand.addEventListener("click",event=>{
     event.preventDefault();
     categoryLanding=true;
@@ -187,10 +185,10 @@ function renderCustomerOrders(snapshot){
     card.append(head);
     card.append(el("p",(order.items||[]).map(i=>(i.name||"პროდუქტი")+" × "+(i.quantity||1)).join(" · "),"customer-order-items"));
     const meta=el("div",undefined,"customer-order-meta");
-    meta.append(el("span","მაგიდა №"+(order.tableNumber||table)),el("strong",money(order.total||0)));
+    meta.append(el("span",order.orderType==="delivery"?"🚚 მიტანა":order.orderType==="takeaway"?"🥡 წასაღებად":"მაგიდა №"+(order.tableNumber||table)),el("strong",money(order.total||0)));
     card.append(meta);
     if(order.note)card.append(el("p","შენიშვნა: "+order.note,"customer-order-note"));
-    if(order.status==="completed")card.append(el("p","შენი შეკვეთა მზადაა! შეგიძლია აიღო.","customer-order-ready"));
+    if(order.status==="completed")card.append(el("p",order.orderType==="delivery"?(order.deliveryStatus==="delivered"?"შეკვეთა ჩაბარებულია.":"შეკვეთა მზადაა — კურიერის სტატუსს ველოდებით."):"შენი შეკვეთა მზადაა! შეგიძლია აიღო.","customer-order-ready"));
     if(order.status==="cancelled")card.append(el("p","ეს შეკვეთა გაუქმებულია.","customer-order-note"));
     root.append(card);
   }
@@ -207,16 +205,20 @@ $("myOrdersButton").onclick=()=>{if(!$("myOrdersDialog").open)$("myOrdersDialog"
 $("myOrdersClose").onclick=()=>$("myOrdersDialog").close();
 $("myOrdersDialog").addEventListener("click",event=>{if(event.target===$("myOrdersDialog"))$("myOrdersDialog").close();});
 async function init(){
-  if(!slug || !Number.isSafeInteger(table) || table<1)throw Error("QR ბმული არასწორია");
+  if(!slug || (!noTable && (!Number.isSafeInteger(table) || table<1)))throw Error("QR ბმული არასწორია");
   await authReady;
   if(!auth.currentUser)await signInAnonymously(auth);
   listenCustomerOrders();
-  const [rs,ts]=await Promise.all([getDoc(doc(db,"restaurants",slug)),getDoc(doc(db,"restaurants",slug,"tables",String(table)))]);
-  if(!rs.exists() || !rs.data().active || !ts.exists() || !ts.data().active)throw Error("რესტორანი ან მაგიდა მიუწვდომელია");
+  const rs=await getDoc(doc(db,"restaurants",slug));
+  if(!rs.exists() || !rs.data().active)throw Error("რესტორანი მიუწვდომელია");
+  let ts=null;
+  if(!noTable){ts=await getDoc(doc(db,"restaurants",slug,"tables",String(table)));if(!ts.exists()||!ts.data().active)throw Error("მაგიდა მიუწვდომელია");}
   restaurant=rs.data();$("restaurantName").textContent=restaurant.name;const brandImage=document.getElementById("restaurantBrandLogo");if(brandImage){if(typeof restaurant.restaurantLogo==="string"&&restaurant.restaurantLogo.startsWith("data:image/jpeg;base64,")){brandImage.src=restaurant.restaurantLogo;brandImage.hidden=false;}else{brandImage.hidden=true;brandImage.removeAttribute("src");}}
   const themeColor=typeof restaurant.themeColor==="string" && /^#[0-9a-f]{6}$/i.test(restaurant.themeColor) ? restaurant.themeColor : DEFAULT_THEME_COLOR;
   applyMenuTheme(themeColor);
-  const tableInfo=$("tableInfo");if(tableInfo)tableInfo.textContent="მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
+  const tableInfo=$("tableInfo");if(tableInfo)tableInfo.textContent=noTable?(orderType==="delivery"?"მიტანა მისამართზე":"წასაღებად"):"მაგიდა №"+table+(ts.data().label && ts.data().label!=="მაგიდა "+table ? " · "+ts.data().label : "");
+  const deliveryFields=$("deliveryFields");if(deliveryFields)deliveryFields.hidden=orderType!=="delivery";
+  const orderModeLabel=$("orderModeLabel");if(orderModeLabel)orderModeLabel.textContent=orderType==="delivery"?"მიტანა მისამართზე":orderType==="takeaway"?"წასაღებად":"მაგიდასთან მომსახურება";
   unsubscribers.push(onSnapshot(collection(db,"restaurants",slug,"categories"),snapshot=>{
     categories.clear();snapshot.forEach(d=>categories.set(d.id,d.data()));renderTabs();render();
   },error=>say("კატეგორიების ჩატვირთვა ვერ მოხერხდა: "+error.message)));
@@ -233,9 +235,12 @@ async function send(){
   try{
     await authReady;
     if(!auth.currentUser)await signInAnonymously(auth);
+    const deliveryAddress=$("deliveryAddress")?.value.trim()||"",customerPhone=$("customerPhone")?.value.trim()||"";
+    if(orderType==="delivery"&&(!deliveryAddress||!customerPhone)){say("მიტანისთვის შეავსე მისამართი და ტელეფონი.");return;}
     const items=[...cart.values()].map(item=>({...item})),total=Math.round(items.reduce((sum,item)=>sum+item.price*item.quantity,0)*100)/100;
     await addDoc(collection(db,"orders"),{
-      restaurantSlug:slug,restaurantName:restaurant.name,customerUid:auth.currentUser.uid,tableNumber:table,tableId:String(table),items,
+      restaurantSlug:slug,restaurantName:restaurant.name,customerUid:auth.currentUser.uid,orderType,tableNumber:noTable?0:table,tableId:noTable?"":String(table),items,
+      ...(orderType==="delivery"?{deliveryAddress,customerPhone}:{}),
       note:$("note").value.trim(),total,status:"new",paymentStatus:"unpaid",...(await window.MENIOSound?.getPushToken?.()?{customerPushToken:await window.MENIOSound.getPushToken()}:{}),createdAt:serverTimestamp()
     });
     cart.clear();$("note").value="";say("შეკვეთა გაიგზავნა!");
