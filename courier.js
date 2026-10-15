@@ -3,7 +3,7 @@ import{showToast}from"./ui.js?v=20261014-ui-1";
 import {mountCourierMap,navigationUrl} from './courier-map.js?v=20261015-navigation-4';
 const $=id=>document.getElementById(id);
 const mapUI=mountCourierMap();
-let profile=null,unsubscribe=null,latestSnapshot=null,shiftUnsub=null,online=false,pricing={restaurantToCustomerPerKm:2,courierToRestaurantPerKm:1},position=null;
+let profile=null,unsubscribe=null,latestSnapshot=null,shiftUnsub=null,online=false,pricing={restaurantToCustomerPerKm:2,courierToRestaurantPerKm:1,minimumCourierPay:0},position=null;
 const quoteCache=new Map();
 const coords=v=>v&&Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)?[v.latitude,v.longitude]:null;
 const round=v=>Math.round((v+Number.EPSILON)*100)/100;
@@ -18,7 +18,8 @@ async function quote(order){
  if(!pickup||!drop||!position)return null;
  const a=await roadMeters([position.latitude,position.longitude],pickup);
  const b=await roadMeters(pickup,drop);
- return {courierToRestaurantMeters:a,restaurantToCustomerMeters:b,courierToRestaurantPerKm:pricing.courierToRestaurantPerKm,restaurantToCustomerPerKm:pricing.restaurantToCustomerPerKm,courierPay:round((a*pricing.courierToRestaurantPerKm+b*pricing.restaurantToCustomerPerKm)/1000)};
+ const calculatedPay=round((a*pricing.courierToRestaurantPerKm+b*pricing.restaurantToCustomerPerKm)/1000);const minimumCourierPay=Number(pricing.minimumCourierPay)||0;
+ return {minimumCourierPay,calculatedPay,courierToRestaurantMeters:a,restaurantToCustomerMeters:b,courierToRestaurantPerKm:pricing.courierToRestaurantPerKm,restaurantToCustomerPerKm:pricing.restaurantToCustomerPerKm,courierPay:Math.max(calculatedPay,minimumCourierPay)};
 }
 async function refreshQuote(order){
  const target=document.getElementById('earning-'+order.id);
@@ -27,7 +28,7 @@ async function refreshQuote(order){
  quoteCache.set(order.id,q);if(!document.getElementById('earning-'+order.id))return;
  target.replaceChildren();const strong=document.createElement('strong');strong.textContent=q.courierPay.toFixed(2)+' ₾';
  const small=document.createElement('small');small.textContent='შენ → რესტორანი: '+q.courierToRestaurantMeters+' მ / '+round(q.courierToRestaurantMeters*q.courierToRestaurantPerKm/1000).toFixed(2)+' ₾ · რესტორანი → კლიენტი: '+q.restaurantToCustomerMeters+' მ / '+round(q.restaurantToCustomerMeters*q.restaurantToCustomerPerKm/1000).toFixed(2)+' ₾';
- target.append(strong,small);const b=document.getElementById('claim-'+order.id);if(b)b.disabled=false;
+ target.append(strong,small);if(q.courierPay>q.calculatedPay){const minimumNote=document.createElement('small');minimumNote.textContent='✓ მინიმალური ანაზღაურება: '+q.minimumCourierPay.toFixed(2)+' ₾';target.append(minimumNote);}const b=document.getElementById('claim-'+order.id);if(b)b.disabled=false;
  }catch(e){target.textContent='საფასური ვერ დაითვალა: '+e.message;}
 }
 function renderShift(){
