@@ -1,4 +1,4 @@
-import {submitCourierApplication} from './courier-registration-service.js';
+import {submitCourierApplication} from './courier-registration-service.js?v=20261015-courier-session-2';
 
 const $=id=>document.getElementById(id),form=$('registration');
 function conditional(){const other=$('city').value==='other',motor=['car','scooter'].includes($('vehicle').value);for(const [field,input,active]of [['otherCityField','otherCity',other],['plateField','plate',motor]]){$(field).hidden=!active;$(input).disabled=!active;$(input).required=active;}}

@@ -1,4 +1,4 @@
-import {auth,db,createUserWithEmailAndPassword,signInWithEmailAndPassword,doc,runTransaction,serverTimestamp} from './firebase.js';
+import {auth,db,createUserWithEmailAndPassword,signInWithEmailAndPassword,doc,runTransaction,serverTimestamp} from './courier-firebase.js';
 
 // Firebase Auth owns credentials; Firestore receives application data only.
 export async function submitCourierApplication(details, password) {

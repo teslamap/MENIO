@@ -1,0 +1,15 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+async function login({profile=null,application=null,error=null}={}){
+ const nodes=Object.fromEntries(['courierLoginForm','courierLoginButton','courierLoginMessage','courierEmail','courierPassword'].map(id=>[id,{value:id==='courierEmail'?'courier@example.com':'password123',textContent:'',disabled:false,addEventListener(type,fn){this.submit=fn;}}]));const reads=[];
+ const context={document:{getElementById:id=>nodes[id]},auth:{authStateReady:async()=>{}},db:{},location:{href:''},signInWithEmailAndPassword:async()=>{if(error)throw error;return {user:{uid:'courier'}};},doc:(_,collection,uid)=>({collection,uid}),getDoc:async ref=>{reads.push(ref);const data=ref.collection==='courierProfiles'?profile:application;return {exists:()=>!!data,data:()=>data};}};
+ vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../courier-login.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/,''),context);await nodes.courierLoginForm.submit({preventDefault(){}});return {nodes,context,reads};
+}
+test('active courier goes to courier board without reading restaurants',async()=>{const h=await login({profile:{role:'courier',active:true}});assert.equal(h.context.location.href,'courier.html');assert.deepEqual(h.reads.map(r=>r.collection),['courierProfiles']);assert.equal(h.nodes.courierPassword.value,'');});
+test('pending applicant receives explicit pending message',async()=>{const h=await login({application:{status:'pending'}});assert.equal(h.context.location.href,'');assert.match(h.nodes.courierLoginMessage.textContent,/განხილვის მოლოდინშია/);assert.ok(h.reads.every(r=>r.collection.startsWith('courier')));});
+test('rejected and missing applicants receive registration status',async()=>{const h=await login({application:{status:'rejected',rejectionReason:'Test reason'}});assert.match(h.nodes.courierLoginMessage.textContent,/Test reason/);const missing=await login();assert.match(missing.nodes.courierLoginMessage.textContent,/განაცხადი არ მოიძებნა/);});
+test('inactive profile cannot enter courier board',async()=>{const h=await login({profile:{role:'courier',active:false}});assert.equal(h.context.location.href,'');assert.match(h.nodes.courierLoginMessage.textContent,/შეჩერებულია/);});
+test('wrong password does not read private courier data and allows retry',async()=>{const h=await login({error:{code:'auth/invalid-credential'}});assert.equal(h.reads.length,0);assert.match(h.nodes.courierLoginMessage.textContent,/პაროლი არასწორია/);assert.equal(h.nodes.courierLoginButton.disabled,false);});
+test('courier Auth uses separate named app and registration uses courier session',()=>{const config=fs.readFileSync(new URL('../courier-firebase.js',import.meta.url),'utf8');assert.match(config,/initializeApp\(firebaseConfig,'ordera-courier'\)/);assert.match(config,/initializeAuth\(courierApp/);assert.match(config,/getFirestore\(courierApp\)/);assert.match(fs.readFileSync(new URL('../courier-registration-service.js',import.meta.url),'utf8'),/from '\.\/courier-firebase\.js'/);});

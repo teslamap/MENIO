@@ -1,4 +1,4 @@
-import{auth,db,doc,getDoc,collection,query,where,onSnapshot,updateDoc,serverTimestamp,onAuthStateChanged,signOut}from"./firebase.js";
+import{auth,db,doc,getDoc,collection,query,where,onSnapshot,updateDoc,serverTimestamp,onAuthStateChanged,signOut}from"./courier-firebase.js";
 import{showToast}from"./ui.js?v=20261014-ui-1";
 const $=id=>document.getElementById(id);
 let profile=null,unsubscribe=null;
@@ -42,10 +42,10 @@ async function change(order,data,button){
  catch(e){showToast("ვერ განახლდა: "+e.message,"error")}
  finally{button.disabled=false;button.textContent=old}
 }
-$("logout").onclick=async()=>{unsubscribe?.();await signOut(auth);location.href="register.html#login"};
+$("logout").onclick=async()=>{unsubscribe?.();await signOut(auth);location.href="courier-login.html"};
 onAuthStateChanged(auth,async user=>{
  unsubscribe?.();
- if(!user||user.isAnonymous){location.href="register.html?returnTo=courier#login";return}
+ if(!user||user.isAnonymous){location.href="courier-login.html";return}
  try{
   const snap=await getDoc(doc(db,"courierProfiles",user.uid));
   if(!snap.exists()||snap.data().active!==true||snap.data().role!=="courier"){setStatus("კურიერის პროფილი ჯერ არ არის გააქტიურებული. დაუკავშირდი ORDERA-ს ადმინისტრატორს.");$("courierOrders").replaceChildren();return}

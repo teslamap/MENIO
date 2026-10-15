@@ -31,7 +31,7 @@ async function setup({user={uid:'courier-a'},profile={role:'courier',active:true
 }
 test('signed-out and anonymous couriers are redirected without subscribing',async()=>{
   for(const user of [null,{uid:'guest',isAnonymous:true}]){
-    const h=await setup({user});assert.match(h.context.location.href,/returnTo=courier/);assert.equal(h.queries.length,0);
+    const h=await setup({user});assert.match(h.context.location.href,/courier-login\.html/);assert.equal(h.queries.length,0);
   }
 });
 test('missing, inactive, and non-courier profiles cannot subscribe',async()=>{

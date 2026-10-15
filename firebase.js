@@ -2,7 +2,7 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/12.4.0/firebase-app
 import{initializeAuth,browserLocalPersistence,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged,signInAnonymously}from"https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import{getFirestore,deleteDoc,writeBatch,doc,getDoc,getDocs,setDoc,addDoc,collection,query,where,orderBy,onSnapshot,updateDoc,serverTimestamp,runTransaction}from"https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
-const firebaseConfig={
+export const firebaseConfig={
   apiKey:"AIzaSyDghOTPxpYXBGijyZMJTL3SxTazB881YMo",
   authDomain:"menio-8de8f.firebaseapp.com",
   projectId:"menio-8de8f",
