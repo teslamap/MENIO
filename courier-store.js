@@ -1,4 +1,4 @@
-import {auth,db,collection,getDocs,doc,getDocs,updateDoc,runTransaction,serverTimestamp} from './firebase.js';
+import {auth,db,collection,getDocs,doc,updateDoc,runTransaction,serverTimestamp} from './firebase.js';
 export const courierStore={
  async list(){const [applications,profiles]=await Promise.all([getDocs(collection(db,'courierApplications')),getDocs(collection(db,'courierProfiles'))]);const map=new Map(profiles.docs.map(d=>[d.id,d.data()]));return applications.docs.map(d=>{const a=d.data(),profile=map.get(d.id);return {...a,id:d.id,profile:profile||null,createdAt:a.createdAt?.toMillis?.()||null,reviewedAt:a.reviewedAt?.toMillis?.()||null};}).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));},
  async saveProfile(uid,fields){if(!auth.currentUser)throw Error('საჭიროა ადმინისტრატორის ავტორიზაცია.');const allowed=['name','phone','email','city','vehicle','plate','active'];const data={};for(const key of allowed)if(Object.prototype.hasOwnProperty.call(fields,key))data[key]=fields[key];if(!Object.keys(data).length)throw Error('ცვლილება არ არის.');await updateDoc(doc(db,'courierProfiles',uid),data);},
