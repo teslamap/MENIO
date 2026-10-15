@@ -1,6 +1,6 @@
 import {mountCouriers} from './courier-admin.js';
 import {courierStore} from './courier-store.js';
-import {auth,db,signInWithEmailAndPassword,onAuthStateChanged,signOut,collection,getDocs} from "./firebase.js";
+import {auth,db,signInWithEmailAndPassword,onAuthStateChanged,signOut,collection,getDocs,doc,getDoc,setDoc,serverTimestamp} from "./firebase.js";
 import {isPlatformAdmin} from "./app.js";
 const $=id=>document.getElementById(id);
 let checking=false, courierPanel=null;
@@ -59,3 +59,20 @@ $("adminLoginForm").addEventListener("submit",async event=>{
  finally{button.disabled=false}
 });
 onAuthStateChanged(auth,handleUser);
+
+const pricingDialog=$('pricingDialog');
+$('pricingOpen').onclick=async()=>{
+ $('pricingStatus').textContent='ტარიფები იტვირთება…';
+ pricingDialog.showModal();
+ try{const snap=await getDoc(doc(db,'platformSettings','deliveryPricing'));const data=snap.exists()?snap.data():{};$('priceToCustomer').value=Number.isFinite(data.restaurantToCustomerPerKm)?data.restaurantToCustomerPerKm:2;$('priceToRestaurant').value=Number.isFinite(data.courierToRestaurantPerKm)?data.courierToRestaurantPerKm:1;$('pricingStatus').textContent='';}
+ catch(e){$('pricingStatus').textContent='ჩატვირთვის შეცდომა: '+e.message;}
+};
+$('pricingClose').onclick=()=>pricingDialog.close();
+$('pricingForm').onsubmit=async e=>{
+ e.preventDefault();const toCustomer=Number($('priceToCustomer').value),toRestaurant=Number($('priceToRestaurant').value);
+ if(![toCustomer,toRestaurant].every(v=>Number.isFinite(v)&&v>=0&&v<=1000)){$('pricingStatus').textContent='მიუთითე სწორი ტარიფები (0–1000 ₾).';return;}
+ const button=$('pricingSave');button.disabled=true;$('pricingStatus').textContent='ინახება…';
+ try{await setDoc(doc(db,'platformSettings','deliveryPricing'),{restaurantToCustomerPerKm:toCustomer,courierToRestaurantPerKm:toRestaurant,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});$('pricingStatus').textContent='ტარიფები შენახულია ✓';}
+ catch(error){$('pricingStatus').textContent='შენახვის შეცდომა: '+error.message;}
+ finally{button.disabled=false;}
+};
