@@ -64,15 +64,15 @@ const pricingDialog=$('pricingDialog');
 $('pricingOpen').onclick=async()=>{
  $('pricingStatus').textContent='ტარიფები იტვირთება…';
  pricingDialog.showModal();
- try{const snap=await getDoc(doc(db,'platformSettings','deliveryPricing'));const data=snap.exists()?snap.data():{};$('priceToCustomer').value=Number.isFinite(data.restaurantToCustomerPerKm)?data.restaurantToCustomerPerKm:2;$('priceToRestaurant').value=Number.isFinite(data.courierToRestaurantPerKm)?data.courierToRestaurantPerKm:1;$('pricingStatus').textContent='';}
+ try{const snap=await getDoc(doc(db,'platformSettings','deliveryPricing'));const data=snap.exists()?snap.data():{};$('priceToCustomer').value=Number.isFinite(data.restaurantToCustomerPerKm)?data.restaurantToCustomerPerKm:2;$('priceToRestaurant').value=Number.isFinite(data.courierToRestaurantPerKm)?data.courierToRestaurantPerKm:1;$('priceMinimum').value=Number.isFinite(data.minimumCourierPay)?data.minimumCourierPay:0;$('pricingStatus').textContent='';}
  catch(e){$('pricingStatus').textContent='ჩატვირთვის შეცდომა: '+e.message;}
 };
 $('pricingClose').onclick=()=>pricingDialog.close();
 $('pricingForm').onsubmit=async e=>{
- e.preventDefault();const toCustomer=Number($('priceToCustomer').value),toRestaurant=Number($('priceToRestaurant').value);
- if(![toCustomer,toRestaurant].every(v=>Number.isFinite(v)&&v>=0&&v<=1000)){$('pricingStatus').textContent='მიუთითე სწორი ტარიფები (0–1000 ₾).';return;}
+ e.preventDefault();const toCustomer=Number($('priceToCustomer').value),toRestaurant=Number($('priceToRestaurant').value),minimum=Number($('priceMinimum').value);
+ if(![toCustomer,toRestaurant,minimum].every(v=>Number.isFinite(v)&&v>=0&&v<=1000)){$('pricingStatus').textContent='მიუთითე სწორი ტარიფები (0–1000 ₾).';return;}
  const button=$('pricingSave');button.disabled=true;$('pricingStatus').textContent='ინახება…';
- try{await setDoc(doc(db,'platformSettings','deliveryPricing'),{restaurantToCustomerPerKm:toCustomer,courierToRestaurantPerKm:toRestaurant,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});$('pricingStatus').textContent='ტარიფები შენახულია ✓';}
+ try{await setDoc(doc(db,'platformSettings','deliveryPricing'),{restaurantToCustomerPerKm:toCustomer,courierToRestaurantPerKm:toRestaurant,minimumCourierPay:minimum,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});$('pricingStatus').textContent='ტარიფები შენახულია ✓';}
  catch(error){$('pricingStatus').textContent='შენახვის შეცდომა: '+error.message;}
  finally{button.disabled=false;}
 };
