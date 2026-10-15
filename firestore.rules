@@ -198,5 +198,6 @@ service cloud.firestore {
             && request.resource.data.deliveredAt == request.time)
         );
       allow delete: if signedIn() && (isPlatformAdmin() || ownsExisting(resource.data.restaurantSlug));
-    }  }
+    }
+  }
 }
