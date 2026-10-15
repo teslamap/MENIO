@@ -65,7 +65,7 @@ const laneConfig=[
 function make(tag,className,text){const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el}
 function makeOrderCard(o){
  const c=make("article","order-card");
- const head=make("div","order-head"),title=make("h2","", "მაგიდა №"+(o.tableNumber??"—"));
+ const head=make("div","order-head"),title=make("h2","",o.orderType==="delivery"?"🚚 მიტანის შეკვეთა":"მაგიდა №"+(o.tableNumber??"—"));
  const statusText=({new:"ახალი შეკვეთა",accepted:"მიღებულია",preparing:"მზადდება",completed:"მზადაა",cancelled:"გაუქმებულია"})[o.status]||o.status||"უცნობი";
  const st=make("span","status status-"+o.status,statusText);head.append(title,st);c.append(head);
  const stamp=o.createdAt?.toDate?.();
@@ -78,12 +78,23 @@ function makeOrderCard(o){
  else c.append(make("p","muted","შეკვეთის პროდუქტები არ არის მითითებული"));
  const total=make("div","order-total"),totalLabel=make("span","","ჯამი"),totalValue=make("strong","",Number(o.total||0).toFixed(2)+" ₾");total.append(totalLabel,totalValue);c.append(total);
  c.append(make("p","order-note",o.note?"შენიშვნა: "+o.note:"შენიშვნა არ არის"));
+ if(o.orderType==="delivery"){
+  c.append(make("p","order-note","მისამართი: "+(o.deliveryAddress||"არ არის მითითებული")));
+  if(o.customerPhone)c.append(make("p","order-note","ტელეფონი: "+o.customerPhone));
+  const deliveryText=({waiting:"კურიერს ელოდება",assigned:"კურიერმა აიღო",picked_up:"კურიერს მიაქვს",delivered:"ჩაბარებულია"})[o.deliveryStatus]||"კურიერი ჯერ არ გამოძახებულა";
+  c.append(make("p","order-note","მიტანის სტატუსი: "+deliveryText));
+ }
  const paymentMeta=make("div","order-meta","გადახდა: "+(o.paymentStatus==="paid"?"გადახდილია":"მოლოდინში"));c.append(paymentMeta);
  const actions=make("div","order-actions");
  if(o.status==="new"||o.status==="accepted"){
   const b=make("button","","მომზადების დაწყება");b.onclick=()=>change(o.id,{status:"preparing"},b);actions.append(b);
  }else if(o.status==="preparing"){
   const b=make("button","","მზადაა");b.onclick=()=>change(o.id,{status:"completed"},b);actions.append(b);
+ }
+ if(o.orderType==="delivery"&&o.status==="completed"&&!["waiting","assigned","picked_up","delivered"].includes(o.deliveryStatus)){
+  const b=make("button","","🚚 კურიერის გამოძახება");b.onclick=()=>change(o.id,{deliveryStatus:"waiting"},b);actions.append(b);
+ }else if(o.orderType==="delivery"&&o.status==="completed"&&o.deliveryStatus==="waiting"){
+  actions.append(make("span","status","კურიერს ველოდებით"));
  }
  if(o.paymentStatus!=="paid"){
   const b=make("button","secondary","გადახდილია");b.onclick=()=>change(o.id,{paymentStatus:"paid"},b);actions.append(b);
