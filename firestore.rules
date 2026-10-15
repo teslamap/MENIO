@@ -132,7 +132,6 @@ service cloud.firestore {
         && request.resource.data.restaurantSlug is string
         && request.resource.data.tableNumber is int
         && request.resource.data.tableId is string
-        && request.resource.data.tableId == string(request.resource.data.tableNumber)
         && request.resource.data.items is list
         && request.resource.data.items.size() > 0
         && request.resource.data.total is number
@@ -141,9 +140,25 @@ service cloud.firestore {
         && request.resource.data.paymentStatus == 'unpaid'
         && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug))
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)).data.active == true
-        && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId))
-        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.number == request.resource.data.tableNumber
-        && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.active == true;
+        && (
+          ((('orderType' in request.resource.data) && request.resource.data.orderType in ['takeaway', 'delivery'])
+            && request.resource.data.tableNumber == 0
+            && request.resource.data.tableId == ''
+            && (request.resource.data.orderType != 'delivery'
+              || (request.resource.data.deliveryAddress is string
+                && request.resource.data.deliveryAddress.size() > 0
+                && request.resource.data.deliveryAddress.size() <= 500
+                && request.resource.data.customerPhone is string
+                && request.resource.data.customerPhone.size() >= 3
+                && request.resource.data.customerPhone.size() <= 40)))
+          ||
+          ((!('orderType' in request.resource.data) || request.resource.data.orderType == 'table')
+            && request.resource.data.tableNumber >= 1
+            && request.resource.data.tableId == string(request.resource.data.tableNumber)
+            && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId))
+            && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.number == request.resource.data.tableNumber
+            && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.active == true)
+        );
       allow read: if signedIn()
         && (isPlatformAdmin()
           || ownsExisting(resource.data.restaurantSlug)
