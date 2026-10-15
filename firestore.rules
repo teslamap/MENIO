@@ -22,6 +22,25 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/courierProfiles/$(request.auth.uid)).data.active == true;
     }
 
+    match /courierShifts/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
+      allow list: if isPlatformAdmin();
+      allow create, update: if isActiveCourier() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['online', 'updatedAt', 'location'])
+        && request.resource.data.keys().hasAll(['online', 'updatedAt', 'location'])
+        && request.resource.data.online is bool
+        && request.resource.data.updatedAt == request.time
+        && (request.resource.data.location == null || (request.resource.data.location is map
+          && request.resource.data.location.keys().hasAll(['latitude', 'longitude'])
+          && request.resource.data.location.keys().hasOnly(['latitude', 'longitude'])
+          && request.resource.data.location.latitude is number
+          && request.resource.data.location.longitude is number
+          && request.resource.data.location.latitude >= -90 && request.resource.data.location.latitude <= 90
+          && request.resource.data.location.longitude >= -180 && request.resource.data.location.longitude <= 180))
+        && (request.resource.data.online == false || request.resource.data.location != null);
+      allow delete: if false;
+    }
+
     match /platformSettings/{settingId} {
       allow read: if settingId == 'deliveryPricing';
       allow create, update: if settingId == 'deliveryPricing' && isPlatformAdmin()
@@ -296,7 +315,13 @@ service cloud.firestore {
             && (!('courierUid' in resource.data) || resource.data.courierUid == null)
             && request.resource.data.courierUid == request.auth.uid
             && request.resource.data.deliveryStatus == 'assigned'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['courierUid', 'deliveryStatus', 'courierAssignedAt'])
+            && get(/databases/$(database)/documents/courierShifts/$(request.auth.uid)).data.online == true
+            && request.resource.data.courierPay is number && request.resource.data.courierPay >= 0
+            && request.resource.data.courierToRestaurantMeters is int && request.resource.data.courierToRestaurantMeters >= 0
+            && request.resource.data.restaurantToCustomerMeters is int && request.resource.data.restaurantToCustomerMeters >= 0
+            && request.resource.data.courierToRestaurantPerKm is number && request.resource.data.courierToRestaurantPerKm >= 0
+            && request.resource.data.restaurantToCustomerPerKm is number && request.resource.data.restaurantToCustomerPerKm >= 0
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['courierUid', 'deliveryStatus', 'courierAssignedAt', 'courierPay', 'courierToRestaurantMeters', 'restaurantToCustomerMeters', 'courierToRestaurantPerKm', 'restaurantToCustomerPerKm'])
             && request.resource.data.courierAssignedAt == request.time)
           ||
           (resource.data.courierUid == request.auth.uid
