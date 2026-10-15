@@ -1,9 +1,11 @@
+import {mountDeliveryLocation} from './customer-location.js?v=20261015-1';
 import {auth,db,doc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,signInAnonymously,onAuthStateChanged,query,where} from "./firebase.js";
 import { safeProductImage } from "./image-utils.js";
 const params=new URLSearchParams(location.search),slug=params.get("restaurant"),table=Number(params.get("table")),requestedType=params.get("orderType"),orderType=["takeaway","delivery"].includes(requestedType)?requestedType:"table",noTable=orderType!=="table";
 const $=id=>document.getElementById(id),cart=new Map(),categories=new Map(),unsubscribers=[];
 let restaurant, dishes=[], selectedCategory="all", categoryLanding=true, sending=false, ready=false, ordersUnsubscribe=null;
 let detailId=null;
+const deliveryGPS=mountDeliveryLocation();
 // The restaurant logo returns to this table's category landing, never to the public index.
 const restaurantBrand=$("restaurantBrandLogo")?.closest("a.menu-brand");
 if(restaurantBrand){
@@ -237,13 +239,15 @@ async function send(){
     if(!auth.currentUser)await signInAnonymously(auth);
     const deliveryAddress=$("deliveryAddress")?.value.trim()||"",customerPhone=$("customerPhone")?.value.trim()||"";
     if(orderType==="delivery"&&(!deliveryAddress||!customerPhone)){say("მიტანისთვის შეავსე მისამართი და ტელეფონი.");return;}
+    const locationResult=orderType==='delivery'?await deliveryGPS.ensure():{proceed:true,location:null};
+    if(!locationResult.proceed){say('შეკვეთა ჯერ არ გაგზავნილა. გააზიარე მდებარეობა ან აირჩიე მხოლოდ მისამართით გაგზავნა.');return;}
     const items=[...cart.values()].map(item=>({...item})),total=Math.round(items.reduce((sum,item)=>sum+item.price*item.quantity,0)*100)/100;
     await addDoc(collection(db,"orders"),{
       restaurantSlug:slug,restaurantName:restaurant.name,customerUid:auth.currentUser.uid,orderType,tableNumber:noTable?0:table,tableId:noTable?"":String(table),items,
-      ...(orderType==="delivery"?{deliveryAddress,customerPhone}:{}),
+      ...(orderType==="delivery"?{deliveryAddress,customerPhone,...(locationResult.location?{deliveryLocation:locationResult.location}:{})}:{}),
       note:$("note").value.trim(),total,status:"new",paymentStatus:"unpaid",...(await window.MENIOSound?.getPushToken?.()?{customerPushToken:await window.MENIOSound.getPushToken()}:{}),createdAt:serverTimestamp()
     });
-    cart.clear();$("note").value="";say("შეკვეთა გაიგზავნა!");
+    cart.clear();deliveryGPS?.clear();$("note").value="";say("შეკვეთა გაიგზავნა!");
   }catch(error){say("შეკვეთა ვერ გაიგზავნა: "+error.message);}
   finally{sending=false;render();drawCart();}
 }

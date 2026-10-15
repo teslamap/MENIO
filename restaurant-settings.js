@@ -1,5 +1,5 @@
 import {auth,db,doc,updateDoc} from './firebase.js';
-import {coordinates} from './courier-map.js?v=20261015-pickup-2';
+import {coordinates} from './courier-map.js?v=20261015-navigation-3';
 export function mountRestaurantSettings(slug,restaurant){
  const $=id=>document.getElementById(id),dialog=$('restaurantSettingsDialog');if(!dialog)return;
  let map,marker,savedLocation=coordinates(restaurant.restaurantLocation),savedAddress=restaurant.restaurantAddress||'',saving=false,locationRequest=0;

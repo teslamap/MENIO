@@ -191,10 +191,23 @@ service cloud.firestore {
       allow list, update, delete: if false;
     }
 
+    function validDeliveryLocation(data) {
+      return !('deliveryLocation' in data) || (data.orderType == 'delivery'
+        && data.deliveryLocation is map
+        && data.deliveryLocation.keys().hasAll(['latitude', 'longitude', 'accuracy'])
+        && data.deliveryLocation.keys().hasOnly(['latitude', 'longitude', 'accuracy'])
+        && data.deliveryLocation.latitude is number
+        && data.deliveryLocation.latitude >= -90 && data.deliveryLocation.latitude <= 90
+        && data.deliveryLocation.longitude is number
+        && data.deliveryLocation.longitude >= -180 && data.deliveryLocation.longitude <= 180
+        && data.deliveryLocation.accuracy is number
+        && data.deliveryLocation.accuracy >= 0 && data.deliveryLocation.accuracy <= 100000);
+    }
     match /orders/{orderId} {
       allow create: if signedIn()
         && request.resource.data.keys().hasAll(['restaurantSlug', 'tableNumber', 'tableId', 'items', 'total', 'status', 'paymentStatus', 'createdAt'])
         && request.resource.data.customerUid == request.auth.uid
+        && validDeliveryLocation(request.resource.data)
         && request.resource.data.restaurantSlug is string
         && request.resource.data.tableNumber is int
         && request.resource.data.tableId is string
