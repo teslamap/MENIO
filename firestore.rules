@@ -189,7 +189,7 @@ service cloud.firestore {
             && request.resource.data.status == resource.data.status
             && request.resource.data.deliveryStatus == 'waiting'
             && (!('deliveryStatus' in resource.data)
-              || !(resource.data.deliveryStatus in ['waiting', 'assigned', 'picked_up', 'delivered']]))));
+              || !(resource.data.deliveryStatus in ['waiting', 'assigned', 'picked_up', 'delivered']))));
 
       // A shared courier can atomically claim an unclaimed delivery order, then advance only their own delivery.
       allow update: if isActiveCourier()
