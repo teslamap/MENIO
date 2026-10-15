@@ -3,6 +3,36 @@ import{showToast}from"./ui.js?v=20261014-ui-1";
 import {mountCourierMap,navigationUrl} from './courier-map.js?v=20261015-navigation-4';
 const $=id=>document.getElementById(id);
 const mapUI=mountCourierMap();
+
+const drawer=$('courierDrawer'),backdrop=$('drawerBackdrop'),detail=$('drawerDetail');
+let financeUnsubscribe=null,deliveredOrders=[];
+function moneyKa(n){return (Number(n)||0).toLocaleString('ka-GE',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₾';}
+function localDay(date){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');}
+function earnings(){const today=localDay(new Date());const done=deliveredOrders.filter(o=>o.deliveryStatus==='delivered'&&o.courierUid===auth.currentUser?.uid&&Number.isFinite(Number(o.courierPay)));const daily=done.filter(o=>o.deliveredAt?.toDate&&localDay(o.deliveredAt.toDate())===today);return {done,daily,todayTotal:daily.reduce((n,o)=>n+Number(o.courierPay),0),allTotal:done.reduce((n,o)=>n+Number(o.courierPay),0)};}
+function updateEarnings(){const e=earnings();$('todayEarnings').textContent=moneyKa(e.todayTotal);if(!detail.hidden&&detail.dataset.panel==='finance')openDetail('finance');}
+function openMenu(){drawer.classList.add('open');drawer.inert=false;drawer.setAttribute('aria-hidden','false');backdrop.hidden=false;$('menuOpen').setAttribute('aria-expanded','true');$('menuClose').focus();}
+function closeMenu(){detail.hidden=true;drawer.classList.remove('open');drawer.inert=true;drawer.setAttribute('aria-hidden','true');backdrop.hidden=true;$('menuOpen').setAttribute('aria-expanded','false');$('menuOpen').focus();}
+$('menuOpen').onclick=openMenu;$('menuClose').onclick=closeMenu;backdrop.onclick=closeMenu;$('detailClose').onclick=closeMenu;
+$('detailBack').onclick=()=>{detail.hidden=true;$('menuClose').focus();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!backdrop.hidden)closeMenu();});
+function line(label,value){const div=document.createElement('div');div.className='finance-stat';const name=document.createElement('small');name.textContent=label;const amount=document.createElement('strong');amount.textContent=value;div.append(name,amount);return div;}
+function openDetail(panel){
+ detail.dataset.panel=panel;detail.hidden=false;const root=$('detailContent');root.replaceChildren();
+ $('detailTitle').textContent=({profile:'პროფილი',finance:'ფინანსები',settings:'პარამეტრები'})[panel]||'მენიუ';
+ if(panel==='profile'){root.append(line('სახელი',profile?.name||'—'),line('ტელეფონი',profile?.phone||'—'),line('ელფოსტა',profile?.email||auth.currentUser?.email||'—'),line('ტრანსპორტი',profile?.vehicle||'—'),line('ქალაქი',profile?.city||'—'));}
+ if(panel==='settings'){const p=document.createElement('p');p.className='detail-note';p.textContent='ხაზზე შესვლა და გასვლა ხდება რუკაზე განთავსებული სლაიდერით. ლოკაციის ნებართვა შეგიძლია მართო ტელეფონის ბრაუზერის ან აპის პარამეტრებში.';root.append(p);}
+ if(panel==='finance'){
+  const e=earnings(),hero=document.createElement('div');hero.className='finance-hero';const caption=document.createElement('small');caption.textContent='სულ ნამუშევარი · ჩაბარებული შეკვეთები';const amount=document.createElement('strong');amount.textContent=moneyKa(e.allTotal);hero.append(caption,amount);root.append(hero);
+  root.append(line('დღეს',moneyKa(e.todayTotal)),line('ჩაბარებული შეკვეთები',String(e.done.length)));
+  const history=document.createElement('section');history.className='finance-history';const title=document.createElement('h3');title.textContent='ნამუშევრების ისტორია';history.append(title);
+  if(!e.done.length){const empty=document.createElement('p');empty.className='detail-note';empty.textContent='ჩაბარებული შეკვეთები ჯერ არ არის. თანხა გამოჩნდება შეკვეთის დასრულების შემდეგ.';history.append(empty);}
+  else for(const o of [...e.done].sort((a,b)=>(b.deliveredAt?.toMillis?.()||0)-(a.deliveredAt?.toMillis?.()||0)).slice(0,40)){const item=document.createElement('div');item.className='finance-item';const label=document.createElement('span');const when=o.deliveredAt?.toDate?.();label.textContent=(o.restaurantName||o.restaurantSlug||'შეკვეთა')+' · '+(when?when.toLocaleDateString('ka-GE'):'თარიღი უცნობია');const value=document.createElement('strong');value.textContent=moneyKa(o.courierPay);item.append(label,value);history.append(item);}
+  root.append(history);
+ }
+}
+document.querySelectorAll('[data-panel]').forEach(button=>button.onclick=()=>openDetail(button.dataset.panel));
+function startFinance(uid){financeUnsubscribe?.();financeUnsubscribe=onSnapshot(query(collection(db,'orders'),where('courierUid','==',uid)),snap=>{deliveredOrders=snap.docs.map(d=>({...d.data(),id:d.id}));updateEarnings();},error=>{console.warn('Courier finance:',error);const p=document.createElement('p');p.className='detail-note';p.textContent='ფინანსების ჩატვირთვა ვერ მოხერხდა: '+error.message;if(!detail.hidden&&detail.dataset.panel==='finance')$('detailContent').append(p);});}
+
 let profile=null,unsubscribe=null,latestSnapshot=null,shiftUnsub=null,online=false,pricing={restaurantToCustomerPerKm:2,courierToRestaurantPerKm:1,minimumCourierPay:0},position=null;
 const quoteCache=new Map();
 const coords=v=>v&&Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)?[v.latitude,v.longitude]:null;
@@ -36,7 +66,7 @@ function renderShift(){
  $('shiftHint').textContent=online?'შეკვეთებს იღებ':'შეკვეთების მიღება შეჩერებულია';
  $('shiftSlider').classList.toggle('online',online);$('shiftSlider').setAttribute('aria-valuenow',online?'1':'0');
  $('shiftInstruction').textContent=online?'გასრიალე ხაზიდან გასასვლელად':'გასრიალე ხაზზე შესასვლელად';
- $('liveLabel').textContent=online?'● ხაზზე ხარ':'○ ხაზგარეშე';
+ $('drawerShift').textContent=online?'● ხაზზე ხარ':'○ ხაზგარეშე';$('drawerShift').classList.toggle('online',online);
 }
 async function toggleShift(){
  if(!auth.currentUser||!profile)return;
@@ -118,9 +148,9 @@ onAuthStateChanged(auth,async user=>{
  try{
   const snap=await getDoc(doc(db,"courierProfiles",user.uid));
   if(!snap.exists()||snap.data().active!==true||snap.data().role!=="courier"){setStatus("კურიერის პროფილი ჯერ არ არის გააქტიურებული. დაუკავშირდი ORDERA-ს ადმინისტრატორს.");$("courierOrders").replaceChildren();mapUI?.updateOrders([]);return}
-  profile=snap.data();shiftUnsub?.();shiftUnsub=onSnapshot(doc(db,'courierShifts',user.uid),s=>{online=s.exists()&&s.data().online===true;if(online&&s.data()?.location)position=s.data().location;renderShift();if(latestSnapshot)render(latestSnapshot);});onSnapshot(doc(db,'platformSettings','deliveryPricing'),s=>{if(s.exists())pricing={...pricing,...s.data()};if(latestSnapshot)render(latestSnapshot);});setStatus("შესული ხარ როგორც "+(profile.name||"კურიერი")+" · სისტემა აქტიურია");
+  profile=snap.data();$('drawerName').textContent=profile.name||'კურიერი';$('drawerPhone').textContent=profile.phone||user.email||'ORDERA Delivery';startFinance(user.uid);shiftUnsub?.();shiftUnsub=onSnapshot(doc(db,'courierShifts',user.uid),s=>{online=s.exists()&&s.data().online===true;if(online&&s.data()?.location)position=s.data().location;renderShift();if(latestSnapshot)render(latestSnapshot);});onSnapshot(doc(db,'platformSettings','deliveryPricing'),s=>{if(s.exists())pricing={...pricing,...s.data()};if(latestSnapshot)render(latestSnapshot);});setStatus("შესული ხარ როგორც "+(profile.name||"კურიერი")+" · სისტემა აქტიურია");
   const q=query(collection(db,"orders"),where("orderType","==","delivery"),where("deliveryStatus","in",["waiting","assigned","picked_up"]));
   unsubscribe=onSnapshot(q,render,error=>setStatus("შეკვეთების ჩატვირთვა ვერ მოხერხდა: "+error.message));
  }catch(e){setStatus("წვდომა ვერ დადასტურდა: "+e.message)}
 });
-window.addEventListener("pagehide",()=>{unsubscribe?.();shiftUnsub?.();clearRestaurants();});
+window.addEventListener("pagehide",()=>{financeUnsubscribe?.();unsubscribe?.();shiftUnsub?.();clearRestaurants();});
