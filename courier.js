@@ -117,7 +117,7 @@ onAuthStateChanged(auth,async user=>{
  try{
   const snap=await getDoc(doc(db,"courierProfiles",user.uid));
   if(!snap.exists()||snap.data().active!==true||snap.data().role!=="courier"){setStatus("კურიერის პროფილი ჯერ არ არის გააქტიურებული. დაუკავშირდი ORDERA-ს ადმინისტრატორს.");$("courierOrders").replaceChildren();mapUI?.updateOrders([]);return}
-  profile=snap.data();shiftUnsub?.();shiftUnsub=onSnapshot(doc(db,'courierShifts',user.uid),s=>{online=s.exists()&&s.data().online===true;renderShift();if(latestSnapshot)render(latestSnapshot);});onSnapshot(doc(db,'platformSettings','deliveryPricing'),s=>{if(s.exists())pricing={...pricing,...s.data()};if(latestSnapshot)render(latestSnapshot);});setStatus("შესული ხარ როგორც "+(profile.name||"კურიერი")+" · სისტემა აქტიურია");
+  profile=snap.data();shiftUnsub?.();shiftUnsub=onSnapshot(doc(db,'courierShifts',user.uid),s=>{online=s.exists()&&s.data().online===true;if(online&&s.data()?.location)position=s.data().location;renderShift();if(latestSnapshot)render(latestSnapshot);});onSnapshot(doc(db,'platformSettings','deliveryPricing'),s=>{if(s.exists())pricing={...pricing,...s.data()};if(latestSnapshot)render(latestSnapshot);});setStatus("შესული ხარ როგორც "+(profile.name||"კურიერი")+" · სისტემა აქტიურია");
   const q=query(collection(db,"orders"),where("orderType","==","delivery"),where("deliveryStatus","in",["waiting","assigned","picked_up"]));
   unsubscribe=onSnapshot(q,render,error=>setStatus("შეკვეთების ჩატვირთვა ვერ მოხერხდა: "+error.message));
  }catch(e){setStatus("წვდომა ვერ დადასტურდა: "+e.message)}
