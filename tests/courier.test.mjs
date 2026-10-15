@@ -22,7 +22,7 @@ async function setup({user={uid:'courier-a'},profile={role:'courier',active:true
     onAuthStateChanged:(_auth,fn)=>{queueMicrotask(()=>fn(user));},
     updateDoc:async(path,data)=>{if(failWrite)throw Error('permission-denied');writes.push({path,data});},
     serverTimestamp:()=> 'SERVER_TIMESTAMP',signOut:async()=>{},
-    showToast:(...args)=>toasts.push(args)
+    mountCourierMap:()=>null,navigationUrl:()=>null,showToast:(...args)=>toasts.push(args)
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(new URL('../courier.js',import.meta.url),'utf8').replace(/^import.*;\r?\n/gm,''),context);

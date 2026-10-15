@@ -31,7 +31,7 @@ jobs:
             node --input-type=module --check < "$file"
           done
       - name: Test current published site pages
-        run: node --test tests/site-smoke.test.mjs tests/courier.test.mjs tests/courier-registration.test.mjs tests/courier-login.test.mjs
+        run: node --test tests/site-smoke.test.mjs tests/courier.test.mjs tests/courier-registration.test.mjs tests/courier-login.test.mjs tests/courier-map.test.mjs
       - name: Check local assets and JavaScript module exports
         run: python tests/check-assets.py
       - name: Ensure Firebase config has no placeholders

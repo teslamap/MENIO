@@ -1,6 +1,8 @@
 import{auth,db,doc,getDoc,collection,query,where,onSnapshot,updateDoc,serverTimestamp,onAuthStateChanged,signOut}from"./courier-firebase.js";
 import{showToast}from"./ui.js?v=20261014-ui-1";
+import {mountCourierMap,navigationUrl} from './courier-map.js?v=20261015-1';
 const $=id=>document.getElementById(id);
+const mapUI=mountCourierMap();
 let profile=null,unsubscribe=null;
 const esc=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 const money=value=>Number(value||0).toFixed(2)+" ₾";
@@ -8,13 +10,15 @@ function setStatus(text){$("status").textContent=text}
 function render(snapshot){
  const root=$("courierOrders");root.replaceChildren();
  const orders=snapshot.docs.map(d=>({...d.data(),id:d.id})).filter(o=>o.orderType==="delivery"&&(["waiting","assigned","picked_up"].includes(o.deliveryStatus)||o.courierUid===auth.currentUser?.uid)).sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+ mapUI?.updateOrders(orders);
  if(!orders.length){const empty=document.createElement("div");empty.className="empty";empty.textContent="ამ ეტაპზე მისაღები მიტანის შეკვეთა არ არის. ახალი შეკვეთა აქ ავტომატურად გამოჩნდება.";root.append(empty);return}
  for(const o of orders){
-  const card=document.createElement("article");card.className="courier-order";
+  const card=document.createElement("article");card.className="courier-order";card.id='courier-order-'+o.id;
   const title=document.createElement("div");title.className="order-top";
   const h=document.createElement("h2");h.textContent=(o.restaurantName||o.restaurantSlug||"რესტორანი")+" · №"+String(o.id).slice(-6).toUpperCase();
   const tag=document.createElement("span");tag.className="courier-tag";tag.textContent=({waiting:"კურიერს ელოდება",assigned:"ჩემთანაა",picked_up:"მიტანის პროცესში",delivered:"ჩაბარებულია"})[o.deliveryStatus]||"მიტანა";
   title.append(h,tag);card.append(title);
+  if(mapUI){const mapButton=document.createElement('button');mapButton.type='button';mapButton.className='order-map-button';mapButton.textContent='რუკაზე ნახვა ⌖';mapButton.onclick=()=>mapUI.focusOrder(o.id);card.append(mapButton);const url=navigationUrl(o);if(url){const link=document.createElement('a');link.className='btn secondary order-map-button';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='ნავიგაცია ↗';card.append(link);}}
   const address=document.createElement("p");address.innerHTML="<strong>მისამართი:</strong> "+esc(o.deliveryAddress||"მისამართი არ არის მითითებული");card.append(address);
   const phone=document.createElement("p");phone.innerHTML="<strong>ტელეფონი:</strong> "+(o.customerPhone?'<a href="tel:'+esc(o.customerPhone)+'">'+esc(o.customerPhone)+'</a>':"არ არის მითითებული");card.append(phone);
   const items=document.createElement("div");items.className="items";
@@ -48,7 +52,7 @@ onAuthStateChanged(auth,async user=>{
  if(!user||user.isAnonymous){location.href="courier-login.html";return}
  try{
   const snap=await getDoc(doc(db,"courierProfiles",user.uid));
-  if(!snap.exists()||snap.data().active!==true||snap.data().role!=="courier"){setStatus("კურიერის პროფილი ჯერ არ არის გააქტიურებული. დაუკავშირდი ORDERA-ს ადმინისტრატორს.");$("courierOrders").replaceChildren();return}
+  if(!snap.exists()||snap.data().active!==true||snap.data().role!=="courier"){setStatus("კურიერის პროფილი ჯერ არ არის გააქტიურებული. დაუკავშირდი ORDERA-ს ადმინისტრატორს.");$("courierOrders").replaceChildren();mapUI?.updateOrders([]);return}
   profile=snap.data();setStatus("შესული ხარ როგორც "+(profile.name||"კურიერი")+" · სისტემა აქტიურია");
   const q=query(collection(db,"orders"),where("orderType","==","delivery"),where("deliveryStatus","in",["waiting","assigned","picked_up"]));
   unsubscribe=onSnapshot(q,render,error=>setStatus("შეკვეთების ჩატვირთვა ვერ მოხერხდა: "+error.message));
