@@ -44,12 +44,14 @@ service cloud.firestore {
     match /platformSettings/{settingId} {
       allow read: if settingId == 'deliveryPricing';
       allow create, update: if settingId == 'deliveryPricing' && isPlatformAdmin()
-        && request.resource.data.keys().hasAll(['restaurantToCustomerPerKm', 'courierToRestaurantPerKm', 'updatedAt', 'updatedBy'])
-        && request.resource.data.keys().hasOnly(['restaurantToCustomerPerKm', 'courierToRestaurantPerKm', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasAll(['restaurantToCustomerPerKm', 'courierToRestaurantPerKm', 'minimumCourierPay', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasOnly(['restaurantToCustomerPerKm', 'courierToRestaurantPerKm', 'minimumCourierPay', 'updatedAt', 'updatedBy'])
         && request.resource.data.restaurantToCustomerPerKm is number
         && request.resource.data.restaurantToCustomerPerKm >= 0 && request.resource.data.restaurantToCustomerPerKm <= 1000
         && request.resource.data.courierToRestaurantPerKm is number
         && request.resource.data.courierToRestaurantPerKm >= 0 && request.resource.data.courierToRestaurantPerKm <= 1000
+        && request.resource.data.minimumCourierPay is number
+        && request.resource.data.minimumCourierPay >= 0 && request.resource.data.minimumCourierPay <= 1000
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if false;
@@ -317,11 +319,14 @@ service cloud.firestore {
             && request.resource.data.deliveryStatus == 'assigned'
             && get(/databases/$(database)/documents/courierShifts/$(request.auth.uid)).data.online == true
             && request.resource.data.courierPay is number && request.resource.data.courierPay >= 0
+            && request.resource.data.minimumCourierPay is number && request.resource.data.minimumCourierPay >= 0
+            && request.resource.data.calculatedPay is number && request.resource.data.calculatedPay >= 0
+            && request.resource.data.courierPay >= request.resource.data.minimumCourierPay
             && request.resource.data.courierToRestaurantMeters is int && request.resource.data.courierToRestaurantMeters >= 0
             && request.resource.data.restaurantToCustomerMeters is int && request.resource.data.restaurantToCustomerMeters >= 0
             && request.resource.data.courierToRestaurantPerKm is number && request.resource.data.courierToRestaurantPerKm >= 0
             && request.resource.data.restaurantToCustomerPerKm is number && request.resource.data.restaurantToCustomerPerKm >= 0
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['courierUid', 'deliveryStatus', 'courierAssignedAt', 'courierPay', 'courierToRestaurantMeters', 'restaurantToCustomerMeters', 'courierToRestaurantPerKm', 'restaurantToCustomerPerKm'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['courierUid', 'deliveryStatus', 'courierAssignedAt', 'courierPay', 'courierToRestaurantMeters', 'restaurantToCustomerMeters', 'courierToRestaurantPerKm', 'restaurantToCustomerPerKm', 'minimumCourierPay', 'calculatedPay'])
             && request.resource.data.courierAssignedAt == request.time)
           ||
           (resource.data.courierUid == request.auth.uid
