@@ -3,3 +3,34 @@
 .map-pickup-marker span{background:#304c43;border-radius:12px;transform:none}.map-pickup-marker b{transform:none;font-weight:900}
 
 .route-panel{border:1px solid #e2dfd2;background:#f3f2e9;border-radius:12px;padding:10px 12px;margin:0 0 10px;flex-shrink:0}.route-panel p{margin:0 0 7px;font-size:11px;line-height:1.7;color:#4c5549}.route-panel small{display:block;font-size:9px;color:#8b8375;margin-top:6px}.route-panel button{font-size:10px;padding:7px 9px}.order-sheet[data-state=collapsed] .route-panel{display:none}.order-sheet[data-state=half]{height:57dvh}
+
+
+/* ORDERA courier floating navigation */
+.courier-topbar{position:absolute;z-index:1100;top:max(18px,env(safe-area-inset-top));left:16px;right:16px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
+.courier-topbar>*{pointer-events:auto}
+.courier-menu-circle{width:66px;height:66px;flex:none;display:grid;place-items:center;border:0;border-radius:50%;background:#fff;color:#242a36;font-size:27px;box-shadow:0 5px 20px #26344328}
+.courier-today-pill{min-width:126px;height:66px;padding:8px 19px;box-sizing:border-box;border-radius:40px;background:#fff;box-shadow:0 5px 20px #26344328;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#262e3b;gap:0}
+.courier-today-pill strong{font-size:19px;line-height:1.3;font-weight:850}.courier-today-pill small{color:#929ba9;font-size:12px}
+.courier-brand{font-size:13px;letter-spacing:-.6px;font-weight:900;color:#202b39;background:#fff;border-radius:30px;padding:14px 11px;box-shadow:0 5px 20px #26344320}.courier-brand span,.drawer-brand span{color:#2db47e}
+.courier-drawer-backdrop{position:fixed;inset:0;z-index:1700;background:#111e3657;backdrop-filter:blur(3px)}
+.courier-drawer{position:fixed;z-index:1701;top:0;bottom:0;left:0;width:min(390px,calc(100vw - 45px));box-sizing:border-box;background:#f8f9fc;padding:calc(max(20px,env(safe-area-inset-top)) + 4px) 17px 28px;box-shadow:14px 0 60px #0f1a3033;transform:translateX(-110%);transition:transform .24s ease;overflow-y:auto;display:flex;flex-direction:column;gap:24px;border-radius:0 28px 28px 0}
+.courier-drawer.open{transform:translateX(0)}
+.drawer-head,.detail-heading{display:flex;align-items:center;justify-content:space-between}.drawer-brand{font-size:23px;font-weight:900;letter-spacing:-1px;color:#263043}
+.drawer-close,.detail-heading button{width:39px;height:39px;display:grid;place-items:center;background:#fff;color:#394456;border:1px solid #edf0f5;border-radius:50%;font-size:19px}
+.drawer-identity{display:flex;align-items:center;gap:13px;background:#fff;padding:18px 13px;border-radius:21px}
+.drawer-avatar{width:65px;height:65px;border-radius:50%;background:#2bb77f;color:#fff;display:grid;place-items:center;font-size:37px;flex:none}
+.drawer-identity h2{font-size:19px;margin:0 0 3px;color:#293241}.drawer-identity p{font-size:12px;margin:0 0 6px;color:#788496}
+.drawer-status{display:inline-block;padding:5px 10px;background:#eef1f5;color:#718094;border-radius:20px;font-size:11px;font-weight:750}.drawer-status.online{background:#dcf7e9;color:#1eab6f}
+.drawer-links{display:grid;gap:10px}.drawer-links button,.drawer-logout{width:100%;display:flex;align-items:center;gap:12px;text-align:left;border:0;border-radius:19px;background:#fff;color:#263142;padding:14px 13px;box-shadow:0 4px 15px #24344708}
+.drawer-links button>span:nth-child(2),.drawer-logout>span:nth-child(2){flex:1;display:grid;gap:4px}.drawer-links strong,.drawer-logout strong{font-size:15px}.drawer-links small,.drawer-logout small{font-size:11px;color:#8792a4;line-height:1.45}
+.drawer-icon{width:43px;height:43px;flex:none;display:grid;place-items:center;background:#7b879b;color:#fff;border-radius:14px;font-size:22px;font-weight:750}.drawer-icon.green{background:#30b77f}.drawer-icon.blue{background:#3e91f6}.drawer-icon.red{background:#f04b62}.drawer-arrow{font-size:28px;color:#a3adba}.drawer-logout{margin-top:auto}
+.drawer-detail{position:fixed;z-index:1702;top:0;bottom:0;left:0;width:min(390px,calc(100vw - 45px));box-sizing:border-box;background:#f8f9fc;padding:calc(max(20px,env(safe-area-inset-top)) + 4px) 17px 28px;border-radius:0 28px 28px 0;overflow-y:auto;box-shadow:14px 0 60px #0f1a3033}
+.detail-heading{gap:10px;margin-bottom:23px}.detail-heading h2{font-size:20px;flex:1;margin:0;color:#263142}.detail-content{display:grid;gap:13px}
+.finance-hero{background:#fff;border-radius:23px;padding:24px 18px;box-shadow:0 4px 18px #2434470a}.finance-hero small{display:block;color:#8894a5;font-size:12px}.finance-hero strong{display:block;color:#233142;font-size:36px;margin-top:6px}
+.finance-stat{background:#fff;border-radius:16px;padding:17px;display:flex;justify-content:space-between;gap:12px;align-items:center;color:#394456}.finance-stat strong{font-size:17px}.finance-stat small{color:#8993a4;font-size:12px}.finance-history{display:grid;gap:8px}.finance-history h3{font-size:15px;margin:8px 0}.finance-item{display:flex;justify-content:space-between;gap:12px;background:#fff;padding:14px;border-radius:13px;font-size:12px;color:#5d6978}.finance-item strong{font-size:14px;color:#23a36d}
+.detail-note{padding:16px;background:#fff;border-radius:16px;color:#687589;font-size:13px;line-height:1.7}
+.shift-bar{top:max(99px,calc(env(safe-area-inset-top) + 82px));background:#fff;color:#263142;border:1px solid #e9edf2;box-shadow:0 8px 24px #26344320}
+.shift-bar small{color:#8390a0}.shift-slider{background:#e8edf1}.shift-slider.online{background:#d4f4e4}.shift-thumb{background:#2cb57c;color:#fff}.courier-earning strong{color:#259c70}.courier-earning small{color:#69788b}
+.map-controls{top:max(215px,calc(env(safe-area-inset-top) + 200px))}.map-message{top:max(300px,calc(env(safe-area-inset-top) + 285px))}
+@media(max-width:500px){.courier-topbar{left:14px;right:14px}.courier-menu-circle{width:59px;height:59px;font-size:24px}.courier-today-pill{height:59px;min-width:113px;padding:7px 13px}.courier-today-pill strong{font-size:17px}.courier-brand{font-size:11px;padding:13px 8px}.shift-bar{top:max(91px,calc(env(safe-area-inset-top) + 72px))}.map-controls{top:max(206px,calc(env(safe-area-inset-top) + 190px))}.map-message{top:max(290px,calc(env(safe-area-inset-top) + 275px))}}
+@media(prefers-reduced-motion:reduce){.courier-drawer{transition:none}}
