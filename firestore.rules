@@ -220,18 +220,15 @@ service cloud.firestore {
     }
     match /courierProfiles/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
+      allow list: if isPlatformAdmin();
       allow create: if isPlatformAdmin()
         && get(/databases/$(database)/documents/courierApplications/$(uid)).data.status == 'pending'
         && approvedCourierMatches(uid, request.resource.data);
-      allow list: if isPlatformAdmin();
       allow update: if isPlatformAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','email','city','vehicle','plate','active'])
         && request.resource.data.role == 'courier'
         && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 121
-        && request.resource.data.phone is string && request.resource.data.phone.matches('^[+]9955[0-9]{8}
-    }
-
-    )
+        && request.resource.data.phone is string && request.resource.data.phone.matches('^[+]9955[0-9]{8}$')
         && request.resource.data.email is string && request.resource.data.email.size() >= 3 && request.resource.data.email.size() <= 254
         && request.resource.data.city is string && request.resource.data.city.size() > 0 && request.resource.data.city.size() <= 80
         && request.resource.data.vehicle in ['bicycle','ebike','scooter','car','walking']
