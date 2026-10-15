@@ -1,6 +1,6 @@
 import{auth,db,doc,getDoc,collection,query,where,onSnapshot,updateDoc,serverTimestamp,onAuthStateChanged,signOut}from"./courier-firebase.js";
 import{showToast}from"./ui.js?v=20261014-ui-1";
-import {mountCourierMap,navigationUrl} from './courier-map.js?v=20261015-navigation-3';
+import {mountCourierMap,navigationUrl} from './courier-map.js?v=20261015-navigation-4';
 const $=id=>document.getElementById(id);
 const mapUI=mountCourierMap();
 let profile=null,unsubscribe=null,latestSnapshot=null;
@@ -47,7 +47,7 @@ function render(snapshot){
 }
 async function change(order,data,button){
  button.disabled=true;const old=button.textContent;button.textContent="ინახება…";
- try{await updateDoc(doc(db,"orders",order.id),data);showToast("შეკვეთის სტატუსი განახლდა","success");if(data.deliveryStatus==="assigned")mapUI?.startNavigation?.({...order,...data});}
+ try{await updateDoc(doc(db,"orders",order.id),data);showToast("შეკვეთის სტატუსი განახლდა","success");if(data.deliveryStatus==="assigned")mapUI?.startNavigation?.({...order,...data});if(data.deliveryStatus==="picked_up")mapUI?.collapseSheet?.();}
  catch(e){showToast("ვერ განახლდა: "+e.message,"error")}
  finally{button.disabled=false;button.textContent=old}
 }
