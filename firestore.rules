@@ -282,6 +282,7 @@ service cloud.firestore {
         && (isPlatformAdmin()
           || ownsExisting(resource.data.restaurantSlug)
           || resource.data.customerUid == request.auth.uid
+          || (isActiveCourier() && resource.data.courierUid == request.auth.uid)
           || (isActiveCourier()
             && resource.data.orderType == 'delivery'
             && resource.data.deliveryStatus in ['waiting', 'assigned', 'picked_up']));
