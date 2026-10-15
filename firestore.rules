@@ -15,6 +15,12 @@ service cloud.firestore {
       return isPlatformAdmin() || (signedIn()
         && get(/databases/$(database)/documents/restaurantOwners/$(slug)).data.ownerUid == request.auth.uid);
     }
+    function isActiveCourier() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/courierProfiles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/courierProfiles/$(request.auth.uid)).data.role == 'courier'
+        && get(/databases/$(database)/documents/courierProfiles/$(request.auth.uid)).data.active == true;
+    }
 
     match /platformAdmins/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
@@ -114,6 +120,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /courierProfiles/{uid} {
+      // Couriers can read only their own profile. Platform admins manage profiles through trusted admin tooling.
+      allow get: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
+      allow list, create, update, delete: if false;
+    }
+
     match /orders/{orderId} {
       allow create: if signedIn()
         && request.resource.data.keys().hasAll(['restaurantSlug', 'tableNumber', 'tableId', 'items', 'total', 'status', 'paymentStatus', 'createdAt'])
@@ -132,7 +144,14 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId))
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.number == request.resource.data.tableNumber
         && get(/databases/$(database)/documents/restaurants/$(request.resource.data.restaurantSlug)/tables/$(request.resource.data.tableId)).data.active == true;
-      allow read: if signedIn() && (isPlatformAdmin() || ownsExisting(resource.data.restaurantSlug) || resource.data.customerUid == request.auth.uid);
+      allow read: if signedIn()
+        && (isPlatformAdmin()
+          || ownsExisting(resource.data.restaurantSlug)
+          || resource.data.customerUid == request.auth.uid
+          || (isActiveCourier()
+            && resource.data.orderType == 'delivery'
+            && resource.data.deliveryStatus in ['waiting', 'assigned', 'picked_up']));
+      // Restaurant staff can manage the kitchen/payment fields and dispatch ready delivery orders.
       allow update: if signedIn()
         && (isPlatformAdmin() || ownsExisting(resource.data.restaurantSlug))
         && request.resource.data.restaurantSlug == resource.data.restaurantSlug
@@ -140,11 +159,44 @@ service cloud.firestore {
         && request.resource.data.tableId == resource.data.tableId
         && request.resource.data.items == resource.data.items
         && request.resource.data.total == resource.data.total
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'archived'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'archived', 'deliveryStatus'])
         && (!('archived' in request.resource.data) || request.resource.data.archived is bool)
         && request.resource.data.status in ['new', 'accepted', 'preparing', 'completed', 'cancelled']
-        && request.resource.data.paymentStatus in ['unpaid', 'paid'];
+        && request.resource.data.paymentStatus in ['unpaid', 'paid']
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveryStatus'])
+          || (resource.data.orderType == 'delivery'
+            && resource.data.status == 'completed'
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.deliveryStatus == 'waiting'
+            && (!('deliveryStatus' in resource.data)
+              || !(resource.data.deliveryStatus in ['waiting', 'assigned', 'picked_up', 'delivered'])));
+
+      // A shared courier can atomically claim an unclaimed delivery order, then advance only their own delivery.
+      allow update: if isActiveCourier()
+        && resource.data.orderType == 'delivery'
+        && request.resource.data.restaurantSlug == resource.data.restaurantSlug
+        && request.resource.data.items == resource.data.items
+        && request.resource.data.total == resource.data.total
+        && (
+          (resource.data.deliveryStatus == 'waiting'
+            && (!('courierUid' in resource.data) || resource.data.courierUid == null)
+            && request.resource.data.courierUid == request.auth.uid
+            && request.resource.data.deliveryStatus == 'assigned'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['courierUid', 'deliveryStatus', 'courierAssignedAt'])
+            && request.resource.data.courierAssignedAt == request.time)
+          ||
+          (resource.data.courierUid == request.auth.uid
+            && resource.data.deliveryStatus == 'assigned'
+            && request.resource.data.deliveryStatus == 'picked_up'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'courierPickedUpAt'])
+            && request.resource.data.courierPickedUpAt == request.time)
+          ||
+          (resource.data.courierUid == request.auth.uid
+            && resource.data.deliveryStatus == 'picked_up'
+            && request.resource.data.deliveryStatus == 'delivered'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryStatus', 'deliveredAt'])
+            && request.resource.data.deliveredAt == request.time)
+        );
       allow delete: if signedIn() && (isPlatformAdmin() || ownsExisting(resource.data.restaurantSlug));
-    }
-  }
+    }  }
 }
